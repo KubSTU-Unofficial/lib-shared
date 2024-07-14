@@ -32,6 +32,6 @@ const schema = new mongoose.Schema({
         type: Date,
         default: new Date()
     }
-}, { collection: "users" });
+}, { collection: "vkUsers" });
 
-export default mongoose.model("users", schema);
+export default mongoose.model("vkUsers", schema);
