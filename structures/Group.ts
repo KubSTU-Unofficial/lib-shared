@@ -41,11 +41,19 @@ export default class BaseGroup {
         let resp = await APIConvertor.ofo(this.name, ugod, sem);
 
         if(!resp || !resp.isok) {
-            // Не кешируем ответ базы данных. Частые обращения к ней не страшны, а вот информация может быть немного устаревшей
-            let dbResponse = await Schedules.findOne({group: this.name}).exec();
+            let dbResponse = await Schedules.findOne({ group: this.name }).exec();
+
+            // Если расписание есть в БД, кешируем его только на час
+            // Если убрать кеш ответа из БД, бот постоянно биться в неработающий сайт
+            if(dbResponse) this.cachedFullRawSchedule = {
+                data: dbResponse.data as IOFORespPara[],
+                updateDate: new Date(date.valueOf() - 1000*60*60*3)
+            };
 
             return dbResponse?.data as IOFORespPara[] | undefined;
         } else {
+            Schedules.findOneAndUpdate({ group: this.name }, { data: resp.data, updateDate: date }, { upsert: true });
+
             this.cachedFullRawSchedule = { data: resp.data, updateDate: date };
 
             return resp.data;
