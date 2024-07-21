@@ -1,7 +1,13 @@
 import fetch from "node-fetch";
 import https from "https";
 
-interface IExamsRespExam {
+interface IAPIResp<T> {
+    "isok": boolean,
+    "data": T,
+    "error_message": string | null
+}
+
+interface IRespExam {
     "date_sd": string,
     "time_sd": string,
     "disc": {
@@ -12,32 +18,18 @@ interface IExamsRespExam {
     "teacher": string
 }
 
-interface IExamsResp {
-    "isok": boolean,
-    "data": IExamsRespExam[],
-    "error_message": string | null
+interface IRespInst {
+    "id": number,
+    "name": string,
+    "fname": string
 }
 
-interface IInstListResp {
-    "isok": boolean,
-    "data": {
-        "id": number,
-        "name": string,
-        "fname": string
-    }[],
-    "error_message": string | null
-}
-
-interface IGroupResp {
-    "isok": boolean,
-    "data": {
-        "id": number,
-        "name": string,
-        "inst_id": number,
-        "formaob_id": number,
-        "kurs": number
-    }[],
-    "error_message": string | null
+interface IRespGroup {
+    "id": number,
+    "name": string,
+    "inst_id": number,
+    "formaob_id": number,
+    "kurs": number
 }
 
 const opts = {
@@ -47,12 +39,12 @@ const opts = {
     agent: new https.Agent({ rejectUnauthorized: false })
 };
 
-export async function ofo(gr:string, ugod: string | number = new Date().getFullYear() - (new Date().getMonth() >= 6 ? 0 : 1), sem: string | number = new Date().getMonth() > 5 ? 1 : 2) {
+export async function ofo(gr: string, ugod: string | number = new Date().getFullYear() - (new Date().getMonth() >= 6 ? 0 : 1), sem: string | number = new Date().getMonth() > 5 ? 1 : 2) {
     let resp = await fetch(`${process.env.KUBSTU_API}/timetable/ofo?gr=${gr}&ugod=${ugod}&semestr=${sem}`, opts)
     .catch(console.log);
 
     if(resp) {
-        let json:IOFOResp = await resp.json() as IOFOResp;
+        let json: IAPIResp<IRespOFOPara[]> = await resp.json() as IAPIResp<IRespOFOPara[]>;
 
         json.data.map(elm => {
             if(!elm.teacher.trim()) elm.teacher = 'Не назначен';
@@ -66,11 +58,11 @@ export async function ofo(gr:string, ugod: string | number = new Date().getFullY
     else return undefined;
 }
 
-export async function exam(gr:string, ugod: string | number = new Date().getFullYear() - (new Date().getMonth() >= 6 ? 0 : 1), sem: string | number = new Date().getMonth() > 5 ? 1 : 2) {
+export async function exam(gr: string, ugod: string | number = new Date().getFullYear() - (new Date().getMonth() >= 6 ? 0 : 1), sem: string | number = new Date().getMonth() > 5 ? 1 : 2) {
     let resp = await fetch(`${process.env.KUBSTU_API}/timetable/exam?gr=${gr}&ugod=${ugod}&semestr=${sem}`, opts)
     .catch(console.log);
 
-    if(resp) return await resp.json() as IExamsResp;
+    if(resp) return await resp.json() as IAPIResp<IRespExam[]>;
     else return undefined;
 }
 
@@ -78,7 +70,7 @@ export async function instList() {
     let resp = await fetch(`${process.env.KUBSTU_API}/timetable/inst-list`, opts)
     .catch(console.log);
 
-    if(resp) return await resp.json() as IInstListResp;
+    if(resp) return await resp.json() as IAPIResp<IRespInst[]>;
     else return undefined;
 }
 
@@ -87,7 +79,7 @@ export async function ofoGroupsList(ugod: number | string = new Date().getFullYe
     .catch(console.log);
 
     if(resp) {
-        let json = await resp.json() as IGroupResp;
+        let json = await resp.json() as IAPIResp<IRespGroup[]>;
 
         if(!json.isok) return json;
         // Из-за какого-то бага, formaob_id=1 не работает, поэтому производим фильтрацию прямо тут

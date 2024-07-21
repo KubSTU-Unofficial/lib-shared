@@ -7,7 +7,7 @@ import { genToken } from "../lib/Utils.js";
 export default class BaseGroup {
     kurs: number;
     cachedFullRawSchedule?: {
-        data: IOFORespPara[],
+        data: IRespOFOPara[],
         updateDate: Date
     };
     
@@ -46,11 +46,11 @@ export default class BaseGroup {
             // Если расписание есть в БД, кешируем его только на час
             // Если убрать кеш ответа из БД, бот постоянно биться в неработающий сайт
             if(dbResponse) this.cachedFullRawSchedule = {
-                data: dbResponse.data as IOFORespPara[],
+                data: dbResponse.data as IRespOFOPara[],
                 updateDate: new Date(date.valueOf() - 1000*60*60*3)
             };
 
-            return dbResponse?.data as IOFORespPara[] | undefined;
+            return dbResponse?.data as IRespOFOPara[] | undefined;
         } else {
             Schedules.findOneAndUpdate({ group: this.name }, { data: resp.data, updateDate: date }, { upsert: true });
 
