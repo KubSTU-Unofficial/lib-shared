@@ -1,38 +1,41 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
-const schema = new mongoose.Schema({
-    userId: {
-        type: String,
-        required: true,
-        unique: true
-    },
-    inst_id: Number,
-    group: String,
+const schema = new mongoose.Schema(
+    {
+        userId: {
+            type: String,
+            required: true,
+            unique: true,
+        },
+        inst_id: Number,
+        group: String,
 
-    notifications: {
-        type: Boolean,
-        default: false
+        notifications: {
+            type: Boolean,
+            default: false,
+        },
+        emoji: {
+            type: Boolean,
+            default: true,
+        },
+        token: {
+            type: String,
+            default: undefined,
+        },
+        showSettings: {
+            type: Boolean,
+            default: true,
+        },
+        showTeachers: {
+            type: Boolean,
+            default: true,
+        },
+        lastActivity: {
+            type: Date,
+            default: new Date(),
+        },
     },
-    emoji: {
-        type: Boolean,
-        default: true
-    },
-    token: {
-        type: String,
-        default: undefined
-    },
-    showSettings: {
-        type: Boolean,
-        default: true
-    },
-    showTeachers: {
-        type: Boolean,
-        default: true
-    },
-    lastActivity: {
-        type: Date,
-        default: new Date()
-    }
-}, { collection: "tgUsers" });
+    { collection: 'tgUsers' },
+);
 
-export default mongoose.model("tgUsers", schema);
+export default mongoose.model('tgUsers', schema);

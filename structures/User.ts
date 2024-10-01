@@ -1,3 +1,3 @@
 export default class BaseUser {
-    constructor(public id:number) {}
+    constructor(public id: number) {}
 }
