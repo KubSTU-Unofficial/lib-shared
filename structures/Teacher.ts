@@ -1,40 +1,40 @@
 import TeacherScheduleModel from '../models/TeacherScheduleModel.js';
 
-interface ITeacherLesson {
+export interface ITeacherLesson {
     group: string;
     number: number;
     time: string;
     name: string;
     paraType: string;
     auditory: string;
+    period?: [number, number];
     remark?: string;
     percent?: string;
-    period?: string;
     flow?: boolean;
 }
 
-interface ITeacherDay {
+export interface ITeacherDay {
     daynum: number;
     even: boolean;
     daySchedule: ITeacherLesson[];
 }
 
-interface ITeacherSchedule {
+export interface ITeacherSchedule {
     days: ITeacherDay[];
     name: string;
     updateDate: Date;
 }
 
 export default class BaseTeacher {
-    schedule?: ITeacherSchedule;
+    schedule?: ITeacherSchedule | null;
 
     async getSchedule(names: string[]) {
-        this.schedule = (await TeacherScheduleModel.findOne({
+        this.schedule = await TeacherScheduleModel.findOne({
             $or: names.map((n) => {
                 return {
                     name: n,
                 };
             }),
-        }).exec()) as ITeacherSchedule;
+        }).exec();
     }
 }

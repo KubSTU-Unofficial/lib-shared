@@ -35,6 +35,22 @@ export interface IRespOFOPara {
     comment: string;
 }
 
+export interface IRespZFOPara {
+    datez: string;
+    pair: number;
+    kindofnagr: {
+        kindofnagr_id: number;
+        kindofnagr_name: string;
+    };
+    disc: {
+        disc_id: number;
+        disc_name: string;
+    };
+    classroom: string;
+    teacher: string;
+    comment: string;
+}
+
 interface IRespExam {
     date_sd: string;
     time_sd: string;
@@ -58,6 +74,18 @@ interface IRespGroup {
     inst_id: number;
     formaob_id: number;
     kurs: number;
+}
+
+export enum FoE { // Form Of Education
+    ofo = 1,
+    ozfo,
+    zfo,
+}
+
+interface IGroupsListFilter {
+    inst_id?: string | number;
+    kurs?: string | number;
+    foe?: FoE;
 }
 
 const opts = {
@@ -88,6 +116,27 @@ export async function ofo(
     } else return undefined;
 }
 
+export async function zfo(
+    gr: string,
+    ugod: string | number = new Date().getFullYear() - (new Date().getMonth() >= 6 ? 0 : 1),
+    sem: string | number = new Date().getMonth() > 5 ? 1 : 2,
+) {
+    let resp = await fetch(`${process.env.KUBSTU_API}/timetable/zfo?gr=${gr}&ugod=${ugod}&semestr=${sem}`, opts).catch(console.log);
+
+    if (resp) {
+        let json: IAPIResp<IRespZFOPara[]> = (await resp.json()) as IAPIResp<IRespZFOPara[]>;
+
+        json.data.map((elm) => {
+            if (!elm.teacher.trim()) elm.teacher = 'Не назначен';
+            if (!elm.classroom.trim()) elm.teacher = 'Не назначена';
+
+            return elm;
+        });
+
+        return json;
+    } else return undefined;
+}
+
 export async function exam(
     gr: string,
     ugod: string | number = new Date().getFullYear() - (new Date().getMonth() >= 6 ? 0 : 1),
@@ -106,13 +155,12 @@ export async function instList() {
     else return undefined;
 }
 
-export async function ofoGroupsList(
+export async function groupsList(
     ugod: number | string = new Date().getFullYear() - (new Date().getMonth() >= 6 ? 0 : 1),
-    inst_id?: string | number,
-    kurs?: string | number,
+    filter?: IGroupsListFilter,
 ) {
     let resp = await fetch(
-        `${process.env.KUBSTU_API}/timetable/gr-list?ugod=${ugod}&formaob_id=1${inst_id ? `&inst_id=${inst_id}` : ''}${inst_id ? `&kurs=${kurs}` : ''}`,
+        `${process.env.KUBSTU_API}/timetable/gr-list?ugod=${ugod}${filter?.foe ? `&formaob_id=${filter.foe}` : ''}${filter?.inst_id ? `&inst_id=${filter.inst_id}` : ''}${filter?.inst_id ? `&kurs=${filter.kurs}` : ''}`,
         opts,
     ).catch(console.log);
 
@@ -121,7 +169,7 @@ export async function ofoGroupsList(
 
         if (!json.isok) return json;
         // Из-за какого-то бага, formaob_id=1 не работает, поэтому производим фильтрацию прямо тут
-        json.data = json.data.filter((g) => g.formaob_id == 1);
+        if (filter?.foe) json.data = json.data.filter((g) => g.formaob_id == filter.foe);
 
         return json;
     } else return undefined;
@@ -129,7 +177,8 @@ export async function ofoGroupsList(
 
 export default {
     ofo,
+    zfo,
     exam,
     instList,
-    ofoGroupsList,
+    groupsList,
 };

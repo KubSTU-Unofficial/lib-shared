@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { ITeacherSchedule } from '../structures/Teacher';
 
 const schema = new mongoose.Schema(
     {
@@ -22,7 +23,7 @@ const schema = new mongoose.Schema(
                         auditory: String,
                         remark: String,
                         percent: String,
-                        period: String,
+                        period: [Number, Number],
                         flow: Boolean,
                     },
                 ],
@@ -32,4 +33,4 @@ const schema = new mongoose.Schema(
     { collection: 'teacherSchedules', versionKey: false },
 );
 
-export default mongoose.model('teacherSchedules', schema);
+export default mongoose.model<ITeacherSchedule>('teacherSchedules', schema);

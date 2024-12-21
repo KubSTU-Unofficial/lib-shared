@@ -1,4 +1,4 @@
-import Schedules from '../models/ScheduleModel.js';
+import Schedules from '../models/OScheduleModel.js';
 import Groups from '../models/GroupsModel.js';
 import APIConvertor, { IRespOFOPara } from '../lib/APIConvertor.js';
 import { genToken } from '../lib/Utils.js';

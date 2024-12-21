@@ -45,7 +45,7 @@ const schema = new mongoose.Schema(
             },
         ],
     },
-    { collection: 'schedules', versionKey: false },
+    { collection: 'oSchedules', versionKey: false },
 );
 
-export default mongoose.model('schedules', schema);
+export default mongoose.model('oSchedules', schema);
