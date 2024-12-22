@@ -24,6 +24,15 @@ export const insts = [
     541,
 ];
 
+/**
+Возвращает понедельник заданной недели. Если заданная неделя это воскресенье, то вернёт следующий понедельник.
+*/
+export function getMonday(oldDate: Date) {
+    let date = new Date(oldDate);
+    date.setDate(date.getDate() - (date.getDay() == 7 ? 0 : date.getDay()) + 1);
+    return date;
+}
+
 export function weekNumber(date: Date = new Date()) {
     // Устанавливаем дату в понедельник
     let mondayDate = new Date(date);
@@ -68,4 +77,5 @@ export default {
     insts,
     weekNumber,
     genToken,
+    getMonday,
 };
