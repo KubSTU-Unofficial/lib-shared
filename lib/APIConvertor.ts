@@ -1,5 +1,6 @@
 import fetch from 'node-fetch';
 import https from 'https';
+import { parse } from 'node-html-parser';
 
 interface IAPIResp<T> {
     isok: boolean;
@@ -175,10 +176,41 @@ export async function groupsList(
     } else return undefined;
 }
 
+/*
+Это (надеюсь) временный метод для получения графика с помощью парсинга
+*/
+export async function parseCalendar(group: string, sem: string | number, ugod: string | number) {
+    let url = `https://elkaf.kubstu.ru/timetable/default/time-table-student-ofo?iskiosk=0&gr=${group}&ugod=${ugod}&semestr=${sem}`;
+
+    const res = await fetch(url, {
+        headers: {
+            'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
+        },
+        agent: new https.Agent({ rejectUnauthorized: false }),
+    });
+
+    const root = parse(await res.text());
+
+    let elm = root //.querySelector('.container');
+        ?.querySelectorAll('p')
+        .find((p) => p.text.includes('График занятий:'));
+
+    let textDate = elm?.innerHTML.trim().slice(16, 26);
+
+    if (!textDate) return undefined;
+
+    const [day, month, year] = textDate.split('.').map(Number);
+
+    let date = new Date(year, month - 1, day);
+
+    return isNaN(date.getTime()) ? undefined : date;
+}
+
 export default {
     ofo,
     zfo,
     exam,
     instList,
     groupsList,
+    parseCalendar,
 };

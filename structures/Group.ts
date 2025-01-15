@@ -1,6 +1,6 @@
 import Schedules from '../models/OScheduleModel.js';
 import Groups from '../models/GroupsModel.js';
-import APIConvertor, { IRespOFOPara } from '../lib/APIConvertor.js';
+import APIConvertor, { IRespOFOPara, parseCalendar } from '../lib/APIConvertor.js';
 import { genToken } from '../lib/Utils.js';
 // import ExamsModel from "../models/ExamsModel.js";
 
@@ -8,6 +8,7 @@ export default class BaseGroup {
     kurs: number;
     cachedFullRawSchedule?: {
         data: IRespOFOPara[];
+        lessonsStartDate?: Date;
         updateDate: Date;
     };
 
@@ -61,6 +62,7 @@ export default class BaseGroup {
             if (dbResponse)
                 this.cachedFullRawSchedule = {
                     data: dbResponse.data as IRespOFOPara[],
+                    lessonsStartDate: dbResponse.lessonsStartDate! ?? this.cachedFullRawSchedule?.lessonsStartDate,
                     updateDate: new Date(date.valueOf() - 1000 * 60 * 60 * 3),
                 };
 
@@ -68,7 +70,11 @@ export default class BaseGroup {
         } else {
             Schedules.findOneAndUpdate({ group: this.name }, { data: resp.data, updateDate: date }, { upsert: true });
 
-            this.cachedFullRawSchedule = { data: resp.data, updateDate: date };
+            this.cachedFullRawSchedule = {
+                data: resp.data,
+                lessonsStartDate: this.cachedFullRawSchedule?.lessonsStartDate ?? (await parseCalendar(this.name, sem, ugod)),
+                updateDate: date,
+            };
 
             return resp.data;
         }
@@ -83,6 +89,14 @@ export default class BaseGroup {
                 .filter((p) => p.nedtype.nedtype_id == (week ? 2 : 1) && p.dayofweek.dayofweek_id == day)
                 .sort((a, b) => a.pair - b.pair);
     }
+
+    // async getLessonsStartDate() {
+    //     let date = new Date();
+    //     let ugod = date.getFullYear() - (date.getMonth() >= 6 ? 0 : 1);
+    //     let sem = date.getMonth() > 5 ? 1 : 2;
+
+    //     return this.cachedFullRawSchedule?.lessonsStartDate ?? (await parseCalendar(this.name, sem, ugod));
+    // }
 
     async getToken(): Promise<string> {
         let groupInfo = await Groups.findOne({ group: this.name, inst_id: this.instId }).exec();

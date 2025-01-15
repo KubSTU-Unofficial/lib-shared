@@ -15,6 +15,10 @@ const schema = new mongoose.Schema(
             required: true,
             default: new Date(),
         },
+        lessonsStartDate: {
+            type: Date,
+            default: undefined,
+        },
         data: [
             {
                 nedtype: {

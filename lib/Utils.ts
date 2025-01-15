@@ -33,25 +33,18 @@ export function getMonday(oldDate: Date) {
     return date;
 }
 
-export function weekNumber(date: Date = new Date()) {
-    // Устанавливаем дату в понедельник
+export function weekNumber(startDate: Date, date: Date = new Date()) {
+    // Устанавливаем даты в понедельник
     let mondayDate = new Date(date);
     mondayDate.setHours(0, 0, 0, 0);
     mondayDate.setDate(date.getDate() - (date.getDay() || 7) + 1);
 
-    let startDate = new Date(date);
-
-    startDate.setHours(0, 0, 0, 0);
-
-    if (date.getMonth() > 7)
-        startDate.setMonth(8, 2); // Ставим 2 сентября. Первое праздник
-    else startDate.setMonth(1, 5); // FIXME: НЕ ТОЧНО! Ставим 5 февраля.
-
-    // Находим дату понедельника текущей недели
-    startDate.setDate(startDate.getDate() - (startDate.getDay() || 7) + 1);
+    let mondayStartDate = new Date(startDate);
+    mondayStartDate.setHours(0, 0, 0, 0);
+    mondayStartDate.setDate(startDate.getDate() - (startDate.getDay() || 7) + 1);
 
     // Находим разницу между данной датой и датой первого дня недели в мс.
-    let diff = mondayDate.valueOf() - startDate.valueOf();
+    let diff = mondayDate.valueOf() - mondayStartDate.valueOf();
 
     // Переводим в недели, округляем в большую сторону и выводим.
     return Math.round(diff / (1000 * 60 * 60 * 24 * 7)) + 1;
