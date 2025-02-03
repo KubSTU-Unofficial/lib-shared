@@ -21,6 +21,7 @@ export default class BaseGroup {
         ['15:00', '16:30'],
         ['16:40', '18:10'],
         ['18:20', '19:50'],
+        ['20:00', '21:30'],
     ];
     static lessonsTypes: { [key: string]: string } = {
         Лекции: 'Лекция',
