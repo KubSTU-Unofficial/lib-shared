@@ -8,7 +8,22 @@ interface IAPIResp<T> {
     error_message: string | null;
 }
 
-export interface IRespOFOPara {
+export interface IRespBasePara {
+    kindofnagr: {
+        kindofnagr_id: number;
+        kindofnagr_name: string;
+    };
+    disc: {
+        disc_id: number;
+        disc_name: string;
+    };
+    pair: number;
+    classroom: string;
+    comment: string;
+    teacher: string;
+}
+
+export interface IRespOFOPara extends IRespBasePara {
     nedtype: {
         nedtype_id: number;
         nedtype_name: string;
@@ -17,39 +32,15 @@ export interface IRespOFOPara {
         dayofweek_id: number;
         dayofweek_name: string;
     };
-    pair: number;
-    kindofnagr: {
-        kindofnagr_id: number;
-        kindofnagr_name: string;
-    };
-    disc: {
-        disc_id: number;
-        disc_name: string;
-    };
     ned_from: number;
     ned_to: number;
     persent_of_gr: number;
     ispotok: boolean;
-    classroom: string;
     isdistant: boolean;
-    teacher: string;
-    comment: string;
 }
 
-export interface IRespZFOPara {
+export interface IRespZFOPara extends IRespBasePara {
     datez: string;
-    pair: number;
-    kindofnagr: {
-        kindofnagr_id: number;
-        kindofnagr_name: string;
-    };
-    disc: {
-        disc_id: number;
-        disc_name: string;
-    };
-    classroom: string;
-    teacher: string;
-    comment: string;
 }
 
 interface IRespExam {

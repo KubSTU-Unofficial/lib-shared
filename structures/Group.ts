@@ -1,13 +1,9 @@
-import Schedules from '../models/OScheduleModel.js';
-import Groups from '../models/GroupsModel.js';
-import APIConvertor, { IRespOFOPara, parseCalendar } from '../lib/APIConvertor.js';
-import { genToken } from '../lib/Utils.js';
-// import ExamsModel from "../models/ExamsModel.js";
+import { IRespBasePara } from '../lib/APIConvertor';
 
-export default class BaseGroup {
+export default abstract class BaseGroup<T extends IRespBasePara> {
     kurs: number;
     cachedFullRawSchedule?: {
-        data: IRespOFOPara[];
+        data: T[];
         lessonsStartDate?: Date;
         updateDate: Date;
     };
@@ -43,77 +39,49 @@ export default class BaseGroup {
      * Если сайт не работает, берёт его с БД
      * Если в БД расписания нет, возвращает undefined
      */
-    async getFullRawSchedule() {
-        let date = new Date();
+    abstract getFullRawSchedule(): Promise<T[] | undefined>;
 
-        if (this.cachedFullRawSchedule && date.valueOf() - this.cachedFullRawSchedule.updateDate.valueOf() < 1000 * 60 * 60 * 4)
-            return this.cachedFullRawSchedule.data;
+    abstract getDayRawSchedule(date: Date): Promise<T[] | undefined>;
+    abstract getDayRawSchedule(day: number, week: boolean): Promise<T[] | undefined>;
 
-        let ugod = date.getFullYear() - (date.getMonth() >= 6 ? 0 : 1);
-        let sem = date.getMonth() > 5 ? 1 : 2;
+    abstract getDayRawSchedule(day: Date | number, week?: boolean): Promise<T[] | undefined>;
 
-        let resp = await APIConvertor.ofo(this.name, ugod, sem);
+    async getRawTeachersList(): Promise<string[]> {
+        let schedule = await this.getFullRawSchedule();
+        let teachers: string[] = [];
 
-        if (!resp || !resp.isok) {
-            let dbResponse = await Schedules.findOne({ group: this.name }).exec();
-
-            // Если расписание есть в БД, кешируем его только на час
-            // Если убрать кеш ответа из БД, бот постоянно биться в неработающий сайт
-            if (dbResponse)
-                this.cachedFullRawSchedule = {
-                    data: dbResponse.data as IRespOFOPara[],
-                    lessonsStartDate: dbResponse.lessonsStartDate! ?? this.cachedFullRawSchedule?.lessonsStartDate,
-                    updateDate: new Date(date.valueOf() - 1000 * 60 * 60 * 3),
-                };
-
-            return dbResponse?.data as IRespOFOPara[] | undefined;
-        } else {
-            Schedules.findOneAndUpdate({ group: this.name }, { data: resp.data, updateDate: date }, { upsert: true });
-
-            this.cachedFullRawSchedule = {
-                data: resp.data,
-                lessonsStartDate: this.cachedFullRawSchedule?.lessonsStartDate ?? (await parseCalendar(this.name, sem, ugod)),
-                updateDate: date,
-            };
-
-            return resp.data;
+        if (schedule) {
+            schedule.forEach((lesson) => {
+                if (lesson.teacher !== 'Не назначен' && !teachers.includes(lesson.teacher!)) teachers.push(lesson.teacher!);
+            });
         }
+
+        return teachers;
     }
 
-    async getDayRawSchedule(day = new Date().getDay(), week = new Date().getWeek() % 2 == 0) {
-        let fullSchedule = await this.getFullRawSchedule();
+    async getRawTeachersAndDisciplines() {
+        let schedule = await this.getFullRawSchedule();
+        let lessons: { [key: string]: { [key: string]: string[] } } = {};
 
-        if (!fullSchedule) return undefined;
-        else
-            return fullSchedule
-                .filter((p) => p.nedtype.nedtype_id == (week ? 2 : 1) && p.dayofweek.dayofweek_id == day)
-                .sort((a, b) => a.pair - b.pair);
-    }
-
-    // async getLessonsStartDate() {
-    //     let date = new Date();
-    //     let ugod = date.getFullYear() - (date.getMonth() >= 6 ? 0 : 1);
-    //     let sem = date.getMonth() > 5 ? 1 : 2;
-
-    //     return this.cachedFullRawSchedule?.lessonsStartDate ?? (await parseCalendar(this.name, sem, ugod));
-    // }
-
-    async getToken(): Promise<string> {
-        let groupInfo = await Groups.findOne({ group: this.name, inst_id: this.instId }).exec();
-
-        if (groupInfo) return groupInfo.token;
-        else {
-            let token = genToken(this.name, this.instId);
-
-            new Groups({
-                group: this.name,
-                inst_id: this.instId,
-                token,
-            })
-                .save()
-                .catch(console.log);
-
-            return token;
+        if (schedule) {
+            schedule.forEach((lesson) => {
+                if (!lessons[lesson.disc.disc_name]) lessons[lesson.disc.disc_name] = {};
+                if (!lessons[lesson.disc.disc_name][lesson.teacher]) lessons[lesson.disc.disc_name][lesson.teacher] = [];
+                if (!lessons[lesson.disc.disc_name][lesson.teacher].includes(lesson.kindofnagr.kindofnagr_name))
+                    lessons[lesson.disc.disc_name][lesson.teacher].push(lesson.kindofnagr.kindofnagr_name);
+            });
         }
+
+        return lessons;
     }
+
+    static isZFOGroup(name: string) {
+        return /^[^\\-]+-(АЗ|З|ОЗ)[^-]*-/.test(name);
+    }
+
+    isZFOGroup() {
+        return BaseGroup.isZFOGroup(this.name);
+    }
+
+    abstract getToken(): Promise<string>;
 }

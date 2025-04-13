@@ -30,11 +30,7 @@ export default class BaseTeacher {
 
     async getSchedule(names: string[]) {
         this.schedule = await TeacherScheduleModel.findOne({
-            $or: names.map((n) => {
-                return {
-                    name: n,
-                };
-            }),
+            $or: names.map((n) => ({ name: n })),
         }).exec();
     }
 }
