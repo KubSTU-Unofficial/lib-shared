@@ -17,6 +17,7 @@ export default abstract class BaseGroup<T extends IRespBasePara> {
         ['15:00', '16:30'],
         ['16:40', '18:10'],
         ['18:20', '19:50'],
+        ['20:00', '21:30'],
     ];
     static lessonsTypes: { [key: string]: string } = {
         Лекции: 'Лекция',

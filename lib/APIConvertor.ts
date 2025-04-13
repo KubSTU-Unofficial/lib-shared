@@ -1,6 +1,15 @@
-import fetch from 'node-fetch';
+import { default as fetchRaw, RequestInit } from 'node-fetch';
 import https from 'https';
 import { parse } from 'node-html-parser';
+
+const fetch = async (url: string, options: RequestInit = {}, n: number = 3) => {
+    try {
+        return await fetchRaw(url, options);
+    } catch (err) {
+        if (n <= 1) throw err;
+        return await fetch(url, options, n - 1);
+    }
+};
 
 interface IAPIResp<T> {
     isok: boolean;
