@@ -106,6 +106,12 @@ export async function ofo(
     if (resp) {
         let json: IAPIResp<IRespOFOPara[]> = (await resp.json()) as IAPIResp<IRespOFOPara[]>;
 
+        if (!json || !json.isok || !json.data) {
+            console.log('[APIConvertor] Что-то не так, 110!', json, { gr, ugod, sem });
+
+            return undefined;
+        }
+
         json.data.map((elm) => {
             if (!elm.teacher.trim()) elm.teacher = 'Не назначен';
             if (!elm.classroom.trim()) elm.teacher = 'Не назначена';
@@ -126,6 +132,12 @@ export async function zfo(
 
     if (resp) {
         let json: IAPIResp<IRespZFOPara[]> = (await resp.json()) as IAPIResp<IRespZFOPara[]>;
+
+        if (!json || !json.isok || !json.data) {
+            console.log('[APIConvertor] Что-то не так, 137!', json, { gr, ugod, sem });
+
+            return undefined;
+        }
 
         json.data.map((elm) => {
             if (!elm.teacher.trim()) elm.teacher = 'Не назначен';
