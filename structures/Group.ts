@@ -136,7 +136,7 @@ export default abstract class BaseGroup {
     async getToken(): Promise<string> {
         let groupInfo = await GroupModel.findOne({ group: this.name, inst_id: this.instId }).exec();
 
-        if (groupInfo) return groupInfo.token;
+        if (groupInfo && groupInfo.token) return groupInfo.token;
         else {
             let token = genToken(this.name, this.instId);
 
