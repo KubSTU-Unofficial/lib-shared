@@ -119,6 +119,12 @@ export async function ofo(
     if (resp) {
         let json: IAPIResp<IRespOFOPara[]> = (await resp.json()) as IAPIResp<IRespOFOPara[]>;
 
+        if (!json || !json.isok || !json.data) {
+            console.log('[APIConvertor] Что-то не так, 110!', json, { gr, ugod, sem });
+
+            return undefined;
+        }
+
         let formatedData = json.data.map((elm) => {
             let nElm: ILesson = {
                 day: {
@@ -157,6 +163,12 @@ export async function zfo(
 
     if (resp) {
         let json: IAPIResp<IRespZFOPara[]> = (await resp.json()) as IAPIResp<IRespZFOPara[]>;
+
+        if (!json || !json.isok || !json.data) {
+            console.log('[APIConvertor] Что-то не так, 110!', json, { gr, ugod, sem });
+
+            return undefined;
+        }
 
         let formatedData = json.data.map((elm) => {
             let nElm: ILesson = {
