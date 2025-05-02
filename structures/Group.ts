@@ -1,9 +1,12 @@
-import { IRespBasePara } from '../lib/APIConvertor';
+import APIConvertor, { LessonTypes } from '../lib/APIConvertor.js';
+import LessonModel, { ILesson } from '../models/LessonModel.js';
+import GroupModel from '../models/GroupModel.js';
+import { genToken } from '../lib/Utils.js';
 
-export default abstract class BaseGroup<T extends IRespBasePara> {
+export default abstract class BaseGroup {
     kurs: number;
     cachedFullRawSchedule?: {
-        data: T[];
+        data: ILesson[];
         lessonsStartDate?: Date;
         updateDate: Date;
     };
@@ -19,11 +22,6 @@ export default abstract class BaseGroup<T extends IRespBasePara> {
         ['18:20', '19:50'],
         ['20:00', '21:30'],
     ];
-    static lessonsTypes: { [key: string]: string } = {
-        Лекции: 'Лекция',
-        'Практические занятия': 'Практика',
-        'Лабораторные занятия': 'Лабораторная',
-    };
 
     constructor(
         public name: string,
@@ -35,17 +33,68 @@ export default abstract class BaseGroup<T extends IRespBasePara> {
         this.kurs = now.getUTCFullYear() - 2000 - (now.getUTCMonth() >= 6 ? 0 : 1) - year + 1; // FIXME: Будет работать до 2100 года
     }
 
+    abstract getLessonsStartDate(ugod?: number, sem?: number): Promise<Date | undefined>
+
     /**
-     * Берёт расписание с сайта
-     * Если сайт не работает, берёт его с БД
+     * Берёт расписание с сайта и обновляет его в БД
+     * Если сайт не работает, берёт расписание с БД
      * Если в БД расписания нет, возвращает undefined
      */
-    abstract getFullRawSchedule(): Promise<T[] | undefined>;
+    async getFullRawSchedule() {
+        let date = new Date();
 
-    abstract getDayRawSchedule(date: Date): Promise<T[] | undefined>;
-    abstract getDayRawSchedule(day: number, week: boolean): Promise<T[] | undefined>;
+        if (this.cachedFullRawSchedule && date.valueOf() - this.cachedFullRawSchedule.updateDate.valueOf() < 1000 * 60 * 60 * 4)
+            return this.cachedFullRawSchedule.data;
 
-    abstract getDayRawSchedule(day: Date | number, week?: boolean): Promise<T[] | undefined>;
+        let resp = this.isZFOGroup() ? await APIConvertor.zfo(this.name) : await APIConvertor.ofo(this.name);
+        let lessonsStartDate = this.cachedFullRawSchedule?.lessonsStartDate ?? await this.getLessonsStartDate();
+
+        if (!resp || !resp.isok) {
+            let dbResponse = await LessonModel.find({ group: this.name }).exec();
+
+            // Если расписание есть в БД, кешируем его только на час
+            // Если убрать кеш ответа из БД, бот постоянно биться в неработающий сайт
+            if (dbResponse)
+                this.cachedFullRawSchedule = {
+                    data: dbResponse as ILesson[],
+                    updateDate: new Date(date.valueOf() - 1000 * 60 * 60 * 3),
+                    lessonsStartDate,
+                };
+
+            return dbResponse as ILesson[] | undefined;
+        } else {
+            if(!this.isZFOGroup() && lessonsStartDate) resp.data.map((elm) => {
+                if('nedType' in elm.day) elm.day.weeks.startDate = new Date(lessonsStartDate.valueOf() + 1000 * 60 * 60 * 24 * 7 * (elm.day.weeks.from - 1));
+                return elm;
+            });
+
+            this.updateShedule(resp.data).catch(console.log);
+
+            this.cachedFullRawSchedule = {
+                data: resp.data,
+                updateDate: date,
+                lessonsStartDate,
+            };
+
+            return resp.data;
+        }
+    }
+
+    async updateShedule(newSchedule: ILesson[]) {
+        await LessonModel.deleteMany({ group: this.name }).exec();
+
+        return await LessonModel.insertMany(
+            newSchedule.map(lesson => ({
+                ...lesson,
+                group: this.name,
+            }))
+        );
+    }
+
+    abstract getDayRawSchedule(date: Date): Promise<ILesson[] | undefined>;
+    abstract getDayRawSchedule(day: number, week: boolean): Promise<ILesson[] | undefined>;
+
+    abstract getDayRawSchedule(day: Date | number, week?: boolean): Promise<ILesson[] | undefined>;
 
     async getRawTeachersList(): Promise<string[]> {
         let schedule = await this.getFullRawSchedule();
@@ -53,7 +102,7 @@ export default abstract class BaseGroup<T extends IRespBasePara> {
 
         if (schedule) {
             schedule.forEach((lesson) => {
-                if (lesson.teacher !== 'Не назначен' && !teachers.includes(lesson.teacher!)) teachers.push(lesson.teacher!);
+                if (lesson.teacherName && !teachers.includes(lesson.teacherName!)) teachers.push(lesson.teacherName!);
             });
         }
 
@@ -66,10 +115,10 @@ export default abstract class BaseGroup<T extends IRespBasePara> {
 
         if (schedule) {
             schedule.forEach((lesson) => {
-                if (!lessons[lesson.disc.disc_name]) lessons[lesson.disc.disc_name] = {};
-                if (!lessons[lesson.disc.disc_name][lesson.teacher]) lessons[lesson.disc.disc_name][lesson.teacher] = [];
-                if (!lessons[lesson.disc.disc_name][lesson.teacher].includes(lesson.kindofnagr.kindofnagr_name))
-                    lessons[lesson.disc.disc_name][lesson.teacher].push(lesson.kindofnagr.kindofnagr_name);
+                if (!lessons[lesson.name]) lessons[lesson.name] = {};
+                if (!lessons[lesson.name][lesson.teacherName ?? 'Не назначен']) lessons[lesson.name][lesson.teacherName ?? 'Не назначен'] = [];
+                if (!lessons[lesson.name][lesson.teacherName ?? 'Не назначен'].includes(LessonTypes[lesson.type]))
+                    lessons[lesson.name][lesson.teacherName ?? 'Не назначен'].push(LessonTypes[lesson.type]);
             });
         }
 
@@ -84,5 +133,22 @@ export default abstract class BaseGroup<T extends IRespBasePara> {
         return BaseGroup.isZFOGroup(this.name);
     }
 
-    abstract getToken(): Promise<string>;
+    async getToken(): Promise<string> {
+        let groupInfo = await GroupModel.findOne({ group: this.name, inst_id: this.instId }).exec();
+
+        if (groupInfo) return groupInfo.token;
+        else {
+            let token = genToken(this.name, this.instId);
+
+            new GroupModel({
+                group: this.name,
+                inst_id: this.instId,
+                token,
+            })
+                .save()
+                .catch(console.log);
+
+            return token;
+        }
+    }
 }

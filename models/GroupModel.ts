@@ -2,13 +2,18 @@ import mongoose from 'mongoose';
 
 const schema = new mongoose.Schema(
     {
-        group: {
+        name: {
             type: String,
             required: true,
+            unique: true,
         },
         inst_id: {
             type: Number,
             required: true,
+        },
+        lessonsStartDate: {
+            type: Date,
+            default: undefined,
         },
         token: {
             type: String,
@@ -17,5 +22,7 @@ const schema = new mongoose.Schema(
     },
     { collection: 'groups', versionKey: false },
 );
+
+schema.index({ group: 1 });
 
 export default mongoose.model('groups', schema);

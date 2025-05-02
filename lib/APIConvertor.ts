@@ -1,6 +1,7 @@
 import { default as fetchRaw, RequestInit } from 'node-fetch';
 import https from 'https';
 import { parse } from 'node-html-parser';
+import {ILesson} from '../models/LessonModel.js';
 
 const fetch = async (url: string, options: RequestInit = {}, n: number = 3) => {
     try {
@@ -83,10 +84,22 @@ export enum FoE { // Form Of Education
     zfo,
 }
 
+export enum LessonTypes {
+    'Лекции' = 1,
+    'Практические занятия',
+    'Лабораторные занятия',
+}
+
+export enum LessonTypesShorted {
+    'Лекция' = 1,
+    'Практика',
+    'Лабораторная',
+}
+
 interface IGroupsListFilter {
     inst_id?: string | number;
     kurs?: string | number;
-    foe?: FoE;
+    foe?: 'ofo' | 'zfo';
 }
 
 const opts = {
@@ -106,14 +119,32 @@ export async function ofo(
     if (resp) {
         let json: IAPIResp<IRespOFOPara[]> = (await resp.json()) as IAPIResp<IRespOFOPara[]>;
 
-        json.data.map((elm) => {
-            if (!elm.teacher.trim()) elm.teacher = 'Не назначен';
-            if (!elm.classroom.trim()) elm.teacher = 'Не назначена';
+        let formatedData = json.data.map((elm) => {
+            let nElm: ILesson = {
+                day: {
+                    nedType: elm.nedtype.nedtype_id == 2,
+                    dayOfWeek: elm.dayofweek.dayofweek_id,
+                    weeks: {
+                        from: elm.ned_from,
+                        to: elm.ned_to,
+                    },
+                },
+                number: elm.pair,
+                name: elm.disc.disc_name,
+                type: elm.kindofnagr.kindofnagr_id,
+            };
 
-            return elm;
+            if(elm.classroom.trim()) nElm.classroom = elm.classroom;
+            if(elm.teacher.trim()) nElm.teacherName = elm.teacher;
+            if(elm.ispotok) nElm.isStream = elm.ispotok;
+            if(elm.isdistant) nElm.isDistant = elm.isdistant;
+            if(elm.comment.trim()) nElm.comment = elm.comment;
+            if(elm.persent_of_gr) nElm.percentOfGroup = elm.persent_of_gr;
+
+            return nElm;
         });
 
-        return json;
+        return {...json, data: formatedData} as IAPIResp<ILesson[]>;
     } else return undefined;
 }
 
@@ -127,14 +158,24 @@ export async function zfo(
     if (resp) {
         let json: IAPIResp<IRespZFOPara[]> = (await resp.json()) as IAPIResp<IRespZFOPara[]>;
 
-        json.data.map((elm) => {
-            if (!elm.teacher.trim()) elm.teacher = 'Не назначен';
-            if (!elm.classroom.trim()) elm.teacher = 'Не назначена';
+        let formatedData = json.data.map((elm) => {
+            let nElm: ILesson = {
+                day: {
+                    datez: elm.datez
+                },
+                number: elm.pair,
+                name: elm.disc.disc_name,
+                type: elm.kindofnagr.kindofnagr_id,
+            };
 
-            return elm;
+            if(elm.classroom.trim()) nElm.classroom = elm.classroom;
+            if(elm.teacher.trim()) nElm.teacherName = elm.teacher;
+            if(elm.comment.trim()) nElm.comment = elm.comment;
+
+            return nElm;
         });
 
-        return json;
+        return {...json, data: formatedData} as IAPIResp<ILesson[]>;
     } else return undefined;
 }
 
@@ -161,7 +202,7 @@ export async function groupsList(
     filter?: IGroupsListFilter,
 ) {
     let resp = await fetch(
-        `${process.env.KUBSTU_API}/timetable/gr-list?ugod=${ugod}${filter?.foe ? `&formaob_id=${filter.foe}` : ''}${filter?.inst_id ? `&inst_id=${filter.inst_id}` : ''}${filter?.inst_id ? `&kurs=${filter.kurs}` : ''}`,
+        `${process.env.KUBSTU_API}/timetable/gr-list?ugod=${ugod}${filter?.inst_id ? `&inst_id=${filter.inst_id}` : ''}${filter?.inst_id ? `&kurs=${filter.kurs}` : ''}`,
         opts,
     ).catch(console.log);
 
@@ -169,8 +210,12 @@ export async function groupsList(
         let json = (await resp.json()) as IAPIResp<IRespGroup[]>;
 
         if (!json.isok) return json;
-        // Из-за какого-то бага, formaob_id=1 не работает, поэтому производим фильтрацию прямо тут
-        if (filter?.foe) json.data = json.data.filter((g) => g.formaob_id == filter.foe);
+        // По какой-то причине в API formaob_id=1 не работает, поэтому производим фильтрацию прямо тут
+
+        if (filter?.foe) {
+            let f = filter.foe == 'ofo' ? [1] : [2,3];
+            json.data = json.data.filter((g) => f.includes(g.formaob_id));
+        }
 
         return json;
     } else return undefined;
