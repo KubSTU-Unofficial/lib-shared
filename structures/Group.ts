@@ -1,12 +1,12 @@
 import APIConvertor, { LessonTypes } from '../lib/APIConvertor.js';
-import LessonModel, { ILesson } from '../models/LessonModel.js';
+import LessonModel, { ILessonSchema } from '../models/LessonModel.js';
 import GroupModel from '../models/GroupModel.js';
 import { genToken } from '../lib/Utils.js';
 
 export default abstract class BaseGroup {
     kurs: number;
     cachedFullRawSchedule?: {
-        data: ILesson[];
+        data: ILessonSchema[];
         lessonsStartDate?: Date;
         updateDate: Date;
     };
@@ -43,25 +43,25 @@ export default abstract class BaseGroup {
     async getFullRawSchedule() {
         let date = new Date();
 
-        if (this.cachedFullRawSchedule && date.valueOf() - this.cachedFullRawSchedule.updateDate.valueOf() < 1000 * 60 * 60 * 4)
+        if(this.cachedFullRawSchedule && date.valueOf() - this.cachedFullRawSchedule.updateDate.valueOf() < 1000 * 60 * 60 * 4)
             return this.cachedFullRawSchedule.data;
 
         let resp = this.isZFOGroup() ? await APIConvertor.zfo(this.name) : await APIConvertor.ofo(this.name);
         let lessonsStartDate = this.cachedFullRawSchedule?.lessonsStartDate ?? await this.getLessonsStartDate();
 
-        if (!resp || !resp.isok) {
-            let dbResponse = await LessonModel.find({ group: this.name }).exec();
+        if(!resp || !resp.isok) {
+            let dbResponse = await LessonModel.find({ group: this.name }).lean().exec();
 
             // Если расписание есть в БД, кешируем его только на час
             // Если убрать кеш ответа из БД, бот постоянно биться в неработающий сайт
-            if (dbResponse)
+            if(dbResponse)
                 this.cachedFullRawSchedule = {
-                    data: dbResponse as ILesson[],
-                    updateDate: new Date(date.valueOf() - 1000 * 60 * 60 * 3),
+                    data: dbResponse as ILessonSchema[],
+                    updateDate: new Date(date.valueOf() - 1000 * 60 * 60 * 3), // вычитание делается, чтобы кешировать данные из БД только на час
                     lessonsStartDate,
                 };
 
-            return dbResponse as ILesson[] | undefined;
+            return dbResponse as ILessonSchema[] | undefined;
         } else {
             if(!this.isZFOGroup() && lessonsStartDate) resp.data.map((elm) => {
                 if('nedType' in elm.day) elm.day.weeks.startDate = new Date(lessonsStartDate.valueOf() + 1000 * 60 * 60 * 24 * 7 * (elm.day.weeks.from - 1));
@@ -80,31 +80,24 @@ export default abstract class BaseGroup {
         }
     }
 
-    async updateShedule(newSchedule: ILesson[]) {
+    async updateShedule(newSchedule: ILessonSchema[]) {
         await LessonModel.deleteMany({ group: this.name }).exec();
 
-        return await LessonModel.insertMany(
-            newSchedule.map(lesson => ({
-                ...lesson,
-                group: this.name,
-            }))
-        );
+        return await LessonModel.insertMany(newSchedule);
     }
 
-    abstract getDayRawSchedule(date: Date): Promise<ILesson[] | undefined>;
-    abstract getDayRawSchedule(day: number, week: boolean): Promise<ILesson[] | undefined>;
+    abstract getDayRawSchedule(date: Date): Promise<ILessonSchema[] | undefined>;
+    abstract getDayRawSchedule(day: number, week: boolean): Promise<ILessonSchema[] | undefined>;
 
-    abstract getDayRawSchedule(day: Date | number, week?: boolean): Promise<ILesson[] | undefined>;
+    abstract getDayRawSchedule(day: Date | number, week?: boolean): Promise<ILessonSchema[] | undefined>;
 
     async getRawTeachersList(): Promise<string[]> {
         let schedule = await this.getFullRawSchedule();
         let teachers: string[] = [];
 
-        if (schedule) {
-            schedule.forEach((lesson) => {
-                if (lesson.teacherName && !teachers.includes(lesson.teacherName!)) teachers.push(lesson.teacherName!);
-            });
-        }
+        if(schedule) schedule.forEach((lesson) => {
+            if(lesson.teacherName && !teachers.includes(lesson.teacherName!)) teachers.push(lesson.teacherName!);
+        });
 
         return teachers;
     }
@@ -113,11 +106,11 @@ export default abstract class BaseGroup {
         let schedule = await this.getFullRawSchedule();
         let lessons: { [key: string]: { [key: string]: string[] } } = {};
 
-        if (schedule) {
+        if(schedule) {
             schedule.forEach((lesson) => {
-                if (!lessons[lesson.name]) lessons[lesson.name] = {};
-                if (!lessons[lesson.name][lesson.teacherName ?? 'Не назначен']) lessons[lesson.name][lesson.teacherName ?? 'Не назначен'] = [];
-                if (!lessons[lesson.name][lesson.teacherName ?? 'Не назначен'].includes(LessonTypes[lesson.type]))
+                if(!lessons[lesson.name]) lessons[lesson.name] = {};
+                if(!lessons[lesson.name][lesson.teacherName ?? 'Не назначен']) lessons[lesson.name][lesson.teacherName ?? 'Не назначен'] = [];
+                if(!lessons[lesson.name][lesson.teacherName ?? 'Не назначен'].includes(LessonTypes[lesson.type]))
                     lessons[lesson.name][lesson.teacherName ?? 'Не назначен'].push(LessonTypes[lesson.type]);
             });
         }
@@ -136,7 +129,7 @@ export default abstract class BaseGroup {
     async getToken(): Promise<string> {
         let groupInfo = await GroupModel.findOne({ group: this.name, inst_id: this.instId }).exec();
 
-        if (groupInfo && groupInfo.token) return groupInfo.token;
+        if(groupInfo && groupInfo.token) return groupInfo.token;
         else {
             let token = genToken(this.name, this.instId);
 
@@ -145,8 +138,8 @@ export default abstract class BaseGroup {
                 inst_id: this.instId,
                 token,
             })
-                .save()
-                .catch(console.log);
+            .save()
+            .catch(console.log);
 
             return token;
         }

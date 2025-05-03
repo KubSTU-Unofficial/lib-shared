@@ -1,6 +1,5 @@
 // Нужно для самих кнопок и чтобы они нажимались
 export const daysOdd = ['Нечёт Пн', 'Нечёт Вт', 'Нечёт Ср', 'Нечёт Чт', 'Нечёт Пт', 'Нечёт Сб'];
-
 export const daysEven = ['Чёт Пн', 'Чёт Вт', 'Чёт Ср', 'Чёт Чт', 'Чёт Пт', 'Чёт Сб'];
 
 export const days = ['ВОСКРЕСЕНЬЕ', 'ПОНЕДЕЛЬНИК', 'ВТОРНИК', 'СРЕДА', 'ЧЕТВЕРГ', 'ПЯТНИЦА', 'СУББОТА'];
@@ -25,7 +24,7 @@ export const insts = [
 ];
 
 /**
-Возвращает понедельник заданной недели. Если заданная неделя это воскресенье, то вернёт следующий понедельник.
+* Возвращает понедельник заданной недели. Если заданная неделя это воскресенье, то вернёт следующий понедельник.
 */
 export function getMonday(oldDate: Date) {
     let date = new Date(oldDate);
@@ -33,6 +32,9 @@ export function getMonday(oldDate: Date) {
     return date;
 }
 
+/*
+* Вернёт номер недели от стартовой
+*/
 export function weekNumber(startDate: Date, date: Date = new Date()) {
     // Устанавливаем даты в понедельник
     let mondayDate = new Date(date);
@@ -51,8 +53,8 @@ export function weekNumber(startDate: Date, date: Date = new Date()) {
 }
 
 /**
- * Генерирует 32-символьный токен
- */
+* Генерирует 32-символьный токен
+*/
 export function genToken(name: string, inst_id: number) {
     let chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890'.split('');
     let token = '';

@@ -1,6 +1,7 @@
 import mongoose, {SchemaDefinitionType} from 'mongoose';
 
-export interface ILesson {
+export interface ILessonSchema {
+    group: string;
     day: {
         nedType: boolean,
         dayOfWeek: number,
@@ -19,10 +20,6 @@ export interface ILesson {
     isStream?: boolean;
     isDistant?: boolean;
     comment?: string;
-}
-
-export interface ILessonSchema extends ILesson {
-    group: string;
 }
 
 const schema = new mongoose.Schema<ILessonSchema, {}, {}, {}, SchemaDefinitionType<ILessonSchema>>(

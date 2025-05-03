@@ -12,8 +12,8 @@ export default class BaseTeacher {
         const result: ILessonSchema[] = [];
         const seen = new Map<string, ILessonSchema>();
 
-        for (const lesson of lessons) {
-            if (!lesson.isStream) {
+        for(const lesson of lessons) {
+            if(!lesson.isStream) {
                 result.push(lesson);
                 continue;
             }
@@ -29,7 +29,7 @@ export default class BaseTeacher {
                 isDistant: lesson.isDistant,
             });
 
-            if (seen.has(key)) {
+            if(seen.has(key)) {
                 const existing = seen.get(key)!;
                 existing.group += ` | ${lesson.group}`;
             } else seen.set(key, { ...lesson });
@@ -46,10 +46,10 @@ export default class BaseTeacher {
     async getFullRawSchedule(): Promise<ILessonSchema[] | undefined> {
         let date = new Date();
 
-        if (this.cachedFullRawSchedule && date.valueOf() - this.cachedFullRawSchedule.updateDate.valueOf() < 1000 * 60 * 60 * 4)
+        if(this.cachedFullRawSchedule && date.valueOf() - this.cachedFullRawSchedule.updateDate.valueOf() < 1000 * 60 * 60 * 4)
             return this.cachedFullRawSchedule.data;
 
-        let schedule: ILessonSchema[] = await LessonModel.find({ teacherName: this.name }).exec();
+        let schedule: ILessonSchema[] = await LessonModel.find({ teacherName: this.name }).lean().exec();
 
         if(!schedule) return undefined;
 

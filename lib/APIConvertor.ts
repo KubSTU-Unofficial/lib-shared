@@ -1,13 +1,13 @@
 import { default as fetchRaw, RequestInit } from 'node-fetch';
 import https from 'https';
 import { parse } from 'node-html-parser';
-import {ILesson} from '../models/LessonModel.js';
+import { ILessonSchema } from '../models/LessonModel.js';
 
 const fetch = async (url: string, options: RequestInit = {}, n: number = 3) => {
     try {
         return await fetchRaw(url, options);
-    } catch (err) {
-        if (n <= 1) throw err;
+    } catch(err) {
+        if(n <= 1) throw err;
         return await fetch(url, options, n - 1);
     }
 };
@@ -116,17 +116,18 @@ export async function ofo(
 ) {
     let resp = await fetch(`${process.env.KUBSTU_API}/timetable/ofo?gr=${gr}&ugod=${ugod}&semestr=${sem}`, opts).catch(console.log);
 
-    if (resp) {
+    if(resp) {
         let json: IAPIResp<IRespOFOPara[]> = (await resp.json()) as IAPIResp<IRespOFOPara[]>;
 
-        if (!json || !json.isok || !json.data) {
+        if(!json || !json.isok || !json.data) {
             console.log('[APIConvertor] Что-то не так, 110!', json, { gr, ugod, sem });
 
             return undefined;
         }
 
         let formatedData = json.data.map((elm) => {
-            let nElm: ILesson = {
+            let nElm: ILessonSchema = {
+                group: gr,
                 day: {
                     nedType: elm.nedtype.nedtype_id == 2,
                     dayOfWeek: elm.dayofweek.dayofweek_id,
@@ -150,7 +151,7 @@ export async function ofo(
             return nElm;
         });
 
-        return {...json, data: formatedData} as IAPIResp<ILesson[]>;
+        return { ...json, data: formatedData } as IAPIResp<ILessonSchema[]>;
     } else return undefined;
 }
 
@@ -161,19 +162,20 @@ export async function zfo(
 ) {
     let resp = await fetch(`${process.env.KUBSTU_API}/timetable/zfo?gr=${gr}&ugod=${ugod}&semestr=${sem}`, opts).catch(console.log);
 
-    if (resp) {
+    if(resp) {
         let json: IAPIResp<IRespZFOPara[]> = (await resp.json()) as IAPIResp<IRespZFOPara[]>;
 
-        if (!json || !json.isok || !json.data) {
+        if(!json || !json.isok || !json.data) {
             console.log('[APIConvertor] Что-то не так, 110!', json, { gr, ugod, sem });
 
             return undefined;
         }
 
         let formatedData = json.data.map((elm) => {
-            let nElm: ILesson = {
+            let nElm: ILessonSchema = {
+                group: gr,
                 day: {
-                    datez: elm.datez
+                    datez: elm.datez,
                 },
                 number: elm.pair,
                 name: elm.disc.disc_name,
@@ -187,7 +189,7 @@ export async function zfo(
             return nElm;
         });
 
-        return {...json, data: formatedData} as IAPIResp<ILesson[]>;
+        return { ...json, data: formatedData } as IAPIResp<ILessonSchema[]>;
     } else return undefined;
 }
 
@@ -198,14 +200,14 @@ export async function exam(
 ) {
     let resp = await fetch(`${process.env.KUBSTU_API}/timetable/exam?gr=${gr}&ugod=${ugod}&semestr=${sem}`, opts).catch(console.log);
 
-    if (resp) return (await resp.json()) as IAPIResp<IRespExam[]>;
+    if(resp) return (await resp.json()) as IAPIResp<IRespExam[]>;
     else return undefined;
 }
 
 export async function instList() {
     let resp = await fetch(`${process.env.KUBSTU_API}/timetable/inst-list`, opts).catch(console.log);
 
-    if (resp) return (await resp.json()) as IAPIResp<IRespInst[]>;
+    if(resp) return (await resp.json()) as IAPIResp<IRespInst[]>;
     else return undefined;
 }
 
@@ -218,14 +220,14 @@ export async function groupsList(
         opts,
     ).catch(console.log);
 
-    if (resp) {
+    if(resp) {
         let json = (await resp.json()) as IAPIResp<IRespGroup[]>;
 
-        if (!json.isok) return json;
+        if(!json.isok) return json;
         // По какой-то причине в API formaob_id=1 не работает, поэтому производим фильтрацию прямо тут
 
-        if (filter?.foe) {
-            let f = filter.foe == 'ofo' ? [1] : [2,3];
+        if(filter?.foe) {
+            let f = filter.foe == 'ofo' ? [1] : [2, 3];
             json.data = json.data.filter((g) => f.includes(g.formaob_id));
         }
 
@@ -249,12 +251,12 @@ export async function parseCalendar(group: string, sem: string | number, ugod: s
     const root = parse(await res.text());
 
     let elm = root //.querySelector('.container');
-        ?.querySelectorAll('p')
-        .find((p) => p.text.includes('График занятий:'));
+    ?.querySelectorAll('p')
+    .find((p) => p.text.includes('График занятий:'));
 
     let textDate = elm?.innerHTML.trim().slice(16, 26);
 
-    if (!textDate) return undefined;
+    if(!textDate) return undefined;
 
     const [day, month, year] = textDate.split('.').map(Number);
 
