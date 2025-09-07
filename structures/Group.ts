@@ -36,7 +36,8 @@ export default abstract class BaseGroup {
     abstract getLessonsStartDate(ugod?: number, sem?: number): Promise<Date | undefined>
 
     /**
-     * Берёт расписание с сайта и обновляет его в БД
+     * Берёт расписание с кеша
+     * Если кеш пуст, берёт с сайта, вставляет в кеш, обновляет в БД.
      * Если сайт не работает, берёт расписание с БД
      * Если в БД расписания нет, возвращает undefined
      */

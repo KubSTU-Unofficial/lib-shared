@@ -5,6 +5,7 @@ import GroupModel from '../models/GroupModel.js';
 export default class BaseOGroup extends BaseGroup {
     async getLessonsStartDate(ugod = new Date().getFullYear() - (new Date().getMonth() >= 6 ? 0 : 1), sem = new Date().getMonth() > 5 ? 1 : 2): Promise<Date | undefined> {
         let date = (await GroupModel.findOne({ name: this.name }).lean().exec())?.lessonsStartDate;
+        // FIXME: Нужно добавить проверку на семестр и текущий год до начала нового семестра!
         if(!date) {
             date = (await parseCalendar(this.name, sem, ugod));
 
