@@ -23,6 +23,8 @@ export default abstract class BaseGroup {
         ['20:00', '21:30'],
     ];
 
+    pendingUpdate?: Promise<unknown>;
+
     constructor(
         public name: string,
         public instId: number,
@@ -37,8 +39,8 @@ export default abstract class BaseGroup {
 
     /**
      * Берёт расписание с кеша
-     * Если кеш пуст, берёт с сайта, вставляет в кеш, обновляет в БД.
-     * Если сайт не работает, берёт расписание с БД
+     * Если кеш пуст, берёт с сайта, вставляет в кеш на 4 часа, обновляет в БД.
+     * Если сайт не работает, берёт расписание с БД и вставляет его в кеш на 1 час
      * Если в БД расписания нет, возвращает undefined
      */
     async getFullRawSchedule() {
@@ -64,12 +66,16 @@ export default abstract class BaseGroup {
 
             return dbResponse as ILessonSchema[] | undefined;
         } else {
-            if(!this.isZFOGroup() && lessonsStartDate) resp.data.map((elm) => {
+            if(!this.isZFOGroup() && lessonsStartDate) resp.data.forEach((elm) => {
                 if('nedType' in elm.day) elm.day.weeks.startDate = new Date(lessonsStartDate.valueOf() + 1000 * 60 * 60 * 24 * 7 * (elm.day.weeks.from - 1));
-                return elm;
+                /// return elm;
             });
 
-            this.updateShedule(resp.data).catch(console.log);
+            if (!this.pendingUpdate) this.pendingUpdate = this.updateSchedule(resp.data)
+            .catch(console.log)
+            .finally(() => {
+                this.pendingUpdate = undefined;
+            });
 
             this.cachedFullRawSchedule = {
                 data: resp.data,
@@ -81,7 +87,7 @@ export default abstract class BaseGroup {
         }
     }
 
-    async updateShedule(newSchedule: ILessonSchema[]) {
+    async updateSchedule(newSchedule: ILessonSchema[]) {
         await LessonModel.deleteMany({ group: this.name }).exec();
 
         return await LessonModel.insertMany(newSchedule);
