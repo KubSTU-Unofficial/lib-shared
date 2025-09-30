@@ -53,5 +53,6 @@ const schema = new mongoose.Schema<ILessonSchema, {}, {}, {}, SchemaDefinitionTy
 
 schema.index({ group: 1 });
 schema.index({ teacherName: 1 });
+schema.index({ classroom: 1 });
 
 export default mongoose.model('lessons', schema);
