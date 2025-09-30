@@ -26,7 +26,7 @@ const schema = new mongoose.Schema(
             type: Boolean,
             default: true,
         },
-        showTeachers: {
+        showTools: {
             type: Boolean,
             default: true,
         },
