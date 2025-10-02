@@ -113,15 +113,34 @@ export default class APIConvertor {
     /*
     * Указание, работает ли API. Если false, класс автоматически отправляет undefined со всех методов
     * */
-    static APIWorks = true;
+    static isAPIWorks = true;
+    private static isAPIWorksTimeout?: NodeJS.Timeout;
 
-    private static onErr(err: unknown) {
-        console.log(err);
+    // @ts-ignore
+    private static get = async (url: string, options: RequestInit = {}, n: number = 3) => {
+        if(!this.isAPIWorks) return undefined;
 
-        this.APIWorks = false;
+        try {
+            let resp = await fetchRaw(url, options);
+            let json = await resp.json();
 
-        setTimeout(() => { this.APIWorks = true; }, 1000 * 60 * 60);
-    }
+            // @ts-ignore
+            if(!json?.isok && n > 0) return await this.get(url, options, n - 1);
+
+            return json;
+        } catch(err) {
+            if(n <= 0) {
+                console.log(err);
+
+                this.isAPIWorks = false;
+
+                setTimeout(() => { this.isAPIWorks = true; }, 1000 * 60 * 60);
+
+                return undefined;
+            }
+            return await this.get(url, options, n - 1);
+        }
+    };
 
     /*
     * Получает расписание группы на очной форме обучения
@@ -132,47 +151,41 @@ export default class APIConvertor {
         ugod: string | number = new Date().getFullYear() - (new Date().getMonth() >= 6 ? 0 : 1),
         sem: string | number = new Date().getMonth() > 5 ? 1 : 2,
     ) {
-        if(!this.APIWorks) return undefined;
+        let json: IAPIResp<IRespOFOPara[]> | undefined = (await this.get(`${process.env.KUBSTU_API}/timetable/ofo?gr=${gr}&ugod=${ugod}&semestr=${sem}`, opts)) as IAPIResp<IRespOFOPara[]> | undefined;
 
-        let resp = await fetch(`${process.env.KUBSTU_API}/timetable/ofo?gr=${gr}&ugod=${ugod}&semestr=${sem}`, opts).catch(this.onErr);
+        if(!json?.isok) {
+            console.log('[APIConvertor] Что-то не так!', json, { gr, ugod, sem });
 
-        if(resp) {
-            let json: IAPIResp<IRespOFOPara[]> = (await resp.json()) as IAPIResp<IRespOFOPara[]>;
+            return undefined;
+        }
 
-            if(!json || !json.isok || !json.data) {
-                console.log('[APIConvertor] Что-то не так!', json, { gr, ugod, sem });
-
-                return undefined;
-            }
-
-            let formatedData = json.data.map((elm) => {
-                let nElm: ILessonSchema = {
-                    group: gr,
-                    day: {
-                        nedType: elm.nedtype.nedtype_id == 2,
-                        dayOfWeek: elm.dayofweek.dayofweek_id,
-                        weeks: {
-                            from: elm.ned_from,
-                            to: elm.ned_to,
-                        },
+        let formatedData = json.data.map((elm) => {
+            let nElm: ILessonSchema = {
+                group: gr,
+                day: {
+                    nedType: elm.nedtype.nedtype_id == 2,
+                    dayOfWeek: elm.dayofweek.dayofweek_id,
+                    weeks: {
+                        from: elm.ned_from,
+                        to: elm.ned_to,
                     },
-                    number: elm.pair,
-                    name: elm.disc.disc_name,
-                    type: elm.kindofnagr.kindofnagr_id,
-                };
+                },
+                number: elm.pair,
+                name: elm.disc.disc_name,
+                type: elm.kindofnagr.kindofnagr_id,
+            };
 
-                if(elm.classroom.trim()) nElm.classroom = elm.classroom;
-                if(elm.teacher.trim()) nElm.teacherName = elm.teacher;
-                if(elm.ispotok) nElm.isStream = elm.ispotok;
-                if(elm.isdistant) nElm.isDistant = elm.isdistant;
-                if(elm.comment.trim()) nElm.comment = elm.comment;
-                if(elm.persent_of_gr) nElm.percentOfGroup = elm.persent_of_gr;
+            if(elm.classroom.trim()) nElm.classroom = elm.classroom;
+            if(elm.teacher.trim()) nElm.teacherName = elm.teacher;
+            if(elm.ispotok) nElm.isStream = elm.ispotok;
+            if(elm.isdistant) nElm.isDistant = elm.isdistant;
+            if(elm.comment.trim()) nElm.comment = elm.comment;
+            if(elm.persent_of_gr) nElm.percentOfGroup = elm.persent_of_gr;
 
-                return nElm;
-            });
+            return nElm;
+        });
 
-            return { ...json, data: formatedData } as IAPIResp<ILessonSchema[]>;
-        } else return undefined;
+        return { ...json, data: formatedData } as IAPIResp<ILessonSchema[]>;
     }
 
     /*
@@ -184,39 +197,33 @@ export default class APIConvertor {
         ugod: string | number = new Date().getFullYear() - (new Date().getMonth() >= 6 ? 0 : 1),
         sem: string | number = new Date().getMonth() > 5 ? 1 : 2,
     ) {
-        if(!this.APIWorks) return undefined;
+        let json: IAPIResp<IRespZFOPara[]> | undefined = (await this.get(`${process.env.KUBSTU_API}/timetable/zfo?gr=${gr}&ugod=${ugod}&semestr=${sem}`, opts)) as IAPIResp<IRespZFOPara[]> | undefined;
 
-        let resp = await fetch(`${process.env.KUBSTU_API}/timetable/zfo?gr=${gr}&ugod=${ugod}&semestr=${sem}`, opts).catch(this.onErr);
+        if(!json?.isok) {
+            console.log('[APIConvertor] Что-то не так!', json, { gr, ugod, sem });
 
-        if(resp) {
-            let json: IAPIResp<IRespZFOPara[]> = (await resp.json()) as IAPIResp<IRespZFOPara[]>;
+            return undefined;
+        }
 
-            if(!json || !json.isok || !json.data) {
-                console.log('[APIConvertor] Что-то не так!', json, { gr, ugod, sem });
+        let formatedData = json.data.map((elm) => {
+            let nElm: ILessonSchema = {
+                group: gr,
+                day: {
+                    datez: elm.datez,
+                },
+                number: elm.pair,
+                name: elm.disc.disc_name,
+                type: elm.kindofnagr.kindofnagr_id,
+            };
 
-                return undefined;
-            }
+            if(elm.classroom.trim()) nElm.classroom = elm.classroom;
+            if(elm.teacher.trim()) nElm.teacherName = elm.teacher;
+            if(elm.comment.trim()) nElm.comment = elm.comment;
 
-            let formatedData = json.data.map((elm) => {
-                let nElm: ILessonSchema = {
-                    group: gr,
-                    day: {
-                        datez: elm.datez,
-                    },
-                    number: elm.pair,
-                    name: elm.disc.disc_name,
-                    type: elm.kindofnagr.kindofnagr_id,
-                };
+            return nElm;
+        });
 
-                if(elm.classroom.trim()) nElm.classroom = elm.classroom;
-                if(elm.teacher.trim()) nElm.teacherName = elm.teacher;
-                if(elm.comment.trim()) nElm.comment = elm.comment;
-
-                return nElm;
-            });
-
-            return { ...json, data: formatedData } as IAPIResp<ILessonSchema[]>;
-        } else return undefined;
+        return { ...json, data: formatedData } as IAPIResp<ILessonSchema[]>;
     }
 
     /*
@@ -227,24 +234,30 @@ export default class APIConvertor {
         ugod: string | number = new Date().getFullYear() - (new Date().getMonth() >= 6 ? 0 : 1),
         sem: string | number = new Date().getMonth() > 5 ? 1 : 2,
     ) {
-        if(!this.APIWorks) return undefined;
+        let json: IAPIResp<IRespExam[]> | undefined = (await this.get(`${process.env.KUBSTU_API}/timetable/exam?gr=${gr}&ugod=${ugod}&semestr=${sem}`, opts)) as IAPIResp<IRespExam[]> | undefined;
 
-        let resp = await fetch(`${process.env.KUBSTU_API}/timetable/exam?gr=${gr}&ugod=${ugod}&semestr=${sem}`, opts).catch(this.onErr);
+        if(!json?.isok) {
+            console.log('[APIConvertor] Что-то не так!', json, { gr, ugod, sem });
 
-        if(resp) return (await resp.json()) as IAPIResp<IRespExam[]>;
-        else return undefined;
+            return undefined;
+        }
+
+        return json as IAPIResp<IRespExam[]>;
     }
 
     /*
     * Возвращает список факультетов
     * */
     static async instList() {
-        if(!this.APIWorks) return undefined;
+        let json: IAPIResp<IRespInst[]> | undefined = (await this.get(`${process.env.KUBSTU_API}/timetable/inst-list`, opts)) as IAPIResp<IRespInst[]> | undefined;
 
-        let resp = await fetch(`${process.env.KUBSTU_API}/timetable/inst-list`, opts).catch(this.onErr);
+        if(!json?.isok) {
+            console.log('[APIConvertor] Что-то не так!', json);
 
-        if(resp) return (await resp.json()) as IAPIResp<IRespInst[]>;
-        else return undefined;
+            return undefined;
+        }
+
+        return json as IAPIResp<IRespInst[]>;
     }
 
     /*
@@ -254,26 +267,23 @@ export default class APIConvertor {
         ugod: number | string = new Date().getFullYear() - (new Date().getMonth() >= 6 ? 0 : 1),
         filter?: IGroupsListFilter,
     ) {
-        if(!this.APIWorks) return undefined;
+        let json: IAPIResp<IRespGroup[]> | undefined = (await this.get(`${process.env.KUBSTU_API}/timetable/gr-list?ugod=${ugod}${filter?.inst_id ? `&inst_id=${filter.inst_id}` : ''}${filter?.kurs ? `&kurs=${filter.kurs}` : ''}`, opts)) as IAPIResp<IRespGroup[]> | undefined;
 
-        let resp = await fetch(
-            `${process.env.KUBSTU_API}/timetable/gr-list?ugod=${ugod}${filter?.inst_id ? `&inst_id=${filter.inst_id}` : ''}${filter?.kurs ? `&kurs=${filter.kurs}` : ''}`,
-            opts,
-        ).catch(this.onErr);
+        if(!json?.isok) {
+            console.log('[APIConvertor] Что-то не так!', json, {ugod, filter});
 
-        if(resp) {
-            let json = (await resp.json()) as IAPIResp<IRespGroup[]>;
+            return undefined;
+        }
 
-            if(!json.isok) return json;
-            // По какой-то причине в API formaob_id=1 не работает, поэтому производим фильтрацию прямо тут
+        if(!json.isok) return json;
+        // По какой-то причине в API formaob_id=1 не работает, поэтому производим фильтрацию прямо тут
 
-            if(filter?.foe) {
-                let f = filter.foe == 'ofo' ? [1] : [2, 3];
-                json.data = json.data.filter((g) => f.includes(g.formaob_id));
-            }
+        if(filter?.foe) {
+            let f = filter.foe == 'ofo' ? [1] : [2, 3];
+            json.data = json.data.filter((g) => f.includes(g.formaob_id));
+        }
 
-            return json;
-        } else return undefined;
+        return json;
     }
 }
 
