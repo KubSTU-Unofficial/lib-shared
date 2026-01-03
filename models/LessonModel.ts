@@ -1,58 +1,89 @@
-import mongoose, {SchemaDefinitionType} from 'mongoose';
+import mongoose, { SchemaDefinitionType } from 'mongoose';
+import { LessonTypes } from '../lib/APIConvertor.js';
 
 export interface ILessonSchema {
-    group: string;
-    day: {
-        nedType: boolean,
-        dayOfWeek: number,
-        weeks: {
-            from: number,
-            to: number,
-            startDate?: Date;
-        },
-    } | { datez: string };
-    number: number;
-    name: string;
-    type: number;
-    classroom?: string;
-    teacherName?: string;
-    percentOfGroup?: number;
-    isStream?: boolean;
-    isDistant?: boolean;
-    comment?: string;
+    group: string;          // Название группы
+    name: string;           // Название дисциплины
+    type: number;           // Лекция / Практика / ...
+    teacherName?: string;   // Имя преподавателя
+    classroom?: string;     // Аудитория
+
+    // --- Расписание ---
+    timing: {
+        year: number;           // Учебный год (например, 2025)
+        semester: 1 | 2;        // Семестр (1 = осень, 2 = весна)
+        lessonNumber: number;   // 1–8 (номер пары)
+
+        // --- Очное обучение ---
+        weeks?: {
+            from: number;       // С какой недели
+            to: number;         // По какую
+            startDate?: Date;   // С какой даты
+            endDate?: Date;     // По какую
+
+            type: boolean;      // Тип недели
+            dayOfWeek: number;  // День недели
+        };
+
+        // --- Заочное обучение ---
+        date?: Date;    // Дата занятия
+    };
+
+    // --- Метаданные ---
+    percentOfGroup?: number;    // Процент группы
+    isStream?: boolean;     // Поток
+    isDistant?: boolean;    // Дистанционка
+    comment?: string;       // Заметка
 }
 
-const schema = new mongoose.Schema<ILessonSchema, {}, {}, {}, SchemaDefinitionType<ILessonSchema>>(
+
+export const lessonSchema = new mongoose.Schema<ILessonSchema, {}, {}, {}, SchemaDefinitionType<ILessonSchema>>(
     {
-        group: {type: String, required: true},
-        day: {
-            nedType: Boolean,
-            dayOfWeek: Number,
-            datez: String,
+        group: { type: String, required: true },
+        name: { type: String, required: true },
+        type: {
+            type: Number,
+            enum: Object.values(LessonTypes).filter(v => typeof v === 'number'),
+            required: true
+        },
+        teacherName: { type: String, required: false },
+        classroom: { type: String, required: false },
+
+        timing: {
+            year: { type: Number, required: true },
+            semester: {
+                type: Number,
+                enum: [1, 2],
+                required: true
+            },
+            lessonNumber: { type: Number, required: true },
+
             weeks: {
                 from: Number,
                 to: Number,
                 startDate: Date,
+                endDate: Date,
+
+                type: { type: Boolean },
+                dayOfWeek: Number,
             },
+
+            date: Date,
         },
-        number: {type: Number, required: true},
-        name: {type: String, required: true},
-        type: {type: Number, required: true},
-        classroom: String,
-        teacherName: String,
-        percentOfGroup: {
-            type: Number,
-            default: 100,
-        },
+
+        percentOfGroup: Number,
         isStream: Boolean,
-        isDistant: {type: Boolean, default: false},
+        isDistant: Boolean,
         comment: String,
     },
-    {collection: 'lessons', versionKey: false},
+    {
+        collection: 'lessons',
+        versionKey: false,
+    },
 );
 
-schema.index({ group: 1 });
-schema.index({ teacherName: 1 });
-schema.index({ classroom: 1 });
+lessonSchema.index({ group: 1 });
+lessonSchema.index({ teacherName: 1 });
+lessonSchema.index({ classroom: 1 });
 
-export default mongoose.model('lessons', schema);
+export default mongoose.model('lessons', lessonSchema);

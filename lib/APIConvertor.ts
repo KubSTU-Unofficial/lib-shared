@@ -1,7 +1,10 @@
 import { default as fetchRaw, RequestInit } from 'node-fetch';
 import https from 'https';
-import { parse } from 'node-html-parser';
+import { parse as parseHtml } from 'node-html-parser';
 import { ILessonSchema } from '../models/LessonModel.js';
+import { IExam } from '../models/ExamModel.js';
+import { parse } from 'date-fns';
+import { getCurrentSemesterInfo } from './Utils.js';
 
 const fetch = async (url: string, options: RequestInit = {}, n: number = 3) => {
     try {
@@ -116,15 +119,13 @@ export default class APIConvertor {
     static isAPIWorks = true;
     private static isAPIWorksTimeout?: NodeJS.Timeout;
 
-    // @ts-ignore
-    private static get = async (url: string, options: RequestInit = {}, n: number = 3) => {
+    private static async get<T>(url: string, options: RequestInit = {}, n: number = 3): Promise<IAPIResp<T> | undefined> {
         if(!this.isAPIWorks) return undefined;
 
         try {
             let resp = await fetchRaw(url, options);
-            let json = await resp.json();
+            let json: IAPIResp<T> = (await resp.json()) as IAPIResp<T>;
 
-            // @ts-ignore
             if(!json?.isok && n > 0) return await this.get(url, options, n - 1);
 
             return json;
@@ -140,7 +141,7 @@ export default class APIConvertor {
             }
             return await this.get(url, options, n - 1);
         }
-    };
+    }
 
     /*
     * Получает расписание группы на очной форме обучения
@@ -148,10 +149,10 @@ export default class APIConvertor {
     * */
     static async ofo(
         gr: string,
-        ugod: string | number = new Date().getFullYear() - (new Date().getMonth() >= 6 ? 0 : 1),
-        sem: string | number = new Date().getMonth() > 5 ? 1 : 2,
+        ugod: string | number = getCurrentSemesterInfo().year,
+        sem: string | number = getCurrentSemesterInfo().semester,
     ) {
-        let json: IAPIResp<IRespOFOPara[]> | undefined = (await this.get(`${process.env.KUBSTU_API}/timetable/ofo?gr=${gr}&ugod=${ugod}&semestr=${sem}`, opts)) as IAPIResp<IRespOFOPara[]> | undefined;
+        const json = await this.get<IRespOFOPara[]>(`${process.env.KUBSTU_API}/timetable/ofo?gr=${gr}&ugod=${ugod}&semestr=${sem}`, opts);
 
         if(!json?.isok) {
             console.log('[APIConvertor] Что-то не так!', json, { gr, ugod, sem });
@@ -162,25 +163,29 @@ export default class APIConvertor {
         let formatedData = json.data.map((elm) => {
             let nElm: ILessonSchema = {
                 group: gr,
-                day: {
-                    nedType: elm.nedtype.nedtype_id == 2,
-                    dayOfWeek: elm.dayofweek.dayofweek_id,
+                name: elm.disc.disc_name,
+                type: elm.kindofnagr.kindofnagr_id,
+                timing: {
+                    year: +ugod,
+                    semester: Number(sem) as 1 | 2,
+                    lessonNumber: elm.pair,
+
                     weeks: {
                         from: elm.ned_from,
                         to: elm.ned_to,
+
+                        type: elm.nedtype.nedtype_id == 2,
+                        dayOfWeek: elm.dayofweek.dayofweek_id,
                     },
                 },
-                number: elm.pair,
-                name: elm.disc.disc_name,
-                type: elm.kindofnagr.kindofnagr_id,
             };
 
-            if(elm.classroom.trim()) nElm.classroom = elm.classroom;
             if(elm.teacher.trim()) nElm.teacherName = elm.teacher;
+            if(elm.classroom.trim()) nElm.classroom = elm.classroom;
+            if(elm.persent_of_gr) nElm.percentOfGroup = elm.persent_of_gr;
             if(elm.ispotok) nElm.isStream = elm.ispotok;
             if(elm.isdistant) nElm.isDistant = elm.isdistant;
             if(elm.comment.trim()) nElm.comment = elm.comment;
-            if(elm.persent_of_gr) nElm.percentOfGroup = elm.persent_of_gr;
 
             return nElm;
         });
@@ -194,10 +199,10 @@ export default class APIConvertor {
     * */
     static async zfo(
         gr: string,
-        ugod: string | number = new Date().getFullYear() - (new Date().getMonth() >= 6 ? 0 : 1),
-        sem: string | number = new Date().getMonth() > 5 ? 1 : 2,
+        ugod: string | number = getCurrentSemesterInfo().year,
+        sem: string | number = getCurrentSemesterInfo().semester,
     ) {
-        let json: IAPIResp<IRespZFOPara[]> | undefined = (await this.get(`${process.env.KUBSTU_API}/timetable/zfo?gr=${gr}&ugod=${ugod}&semestr=${sem}`, opts)) as IAPIResp<IRespZFOPara[]> | undefined;
+        const json = await this.get<IRespZFOPara[]>(`${process.env.KUBSTU_API}/timetable/zfo?gr=${gr}&ugod=${ugod}&semestr=${sem}`, opts);
 
         if(!json?.isok) {
             console.log('[APIConvertor] Что-то не так!', json, { gr, ugod, sem });
@@ -208,12 +213,15 @@ export default class APIConvertor {
         let formatedData = json.data.map((elm) => {
             let nElm: ILessonSchema = {
                 group: gr,
-                day: {
-                    datez: elm.datez,
-                },
-                number: elm.pair,
                 name: elm.disc.disc_name,
                 type: elm.kindofnagr.kindofnagr_id,
+
+                timing: {
+                    year: +ugod,
+                    semester: Number(sem) as 1 | 2,
+                    lessonNumber: elm.pair,
+                    date: parse(elm.datez, 'yyyy-MM-dd', new Date()),
+                },
             };
 
             if(elm.classroom.trim()) nElm.classroom = elm.classroom;
@@ -231,10 +239,10 @@ export default class APIConvertor {
     * */
     static async exam(
         gr: string,
-        ugod: string | number = new Date().getFullYear() - (new Date().getMonth() >= 6 ? 0 : 1),
-        sem: string | number = new Date().getMonth() > 5 ? 1 : 2,
+        ugod: string | number = getCurrentSemesterInfo().year,
+        sem: string | number = getCurrentSemesterInfo().semester,
     ) {
-        let json: IAPIResp<IRespExam[]> | undefined = (await this.get(`${process.env.KUBSTU_API}/timetable/exam?gr=${gr}&ugod=${ugod}&semestr=${sem}`, opts)) as IAPIResp<IRespExam[]> | undefined;
+        let json = await this.get<IRespExam[]>(`${process.env.KUBSTU_API}/timetable/exam?gr=${gr}&ugod=${ugod}&semestr=${sem}`, opts);
 
         if(!json?.isok) {
             console.log('[APIConvertor] Что-то не так!', json, { gr, ugod, sem });
@@ -242,44 +250,49 @@ export default class APIConvertor {
             return undefined;
         }
 
-        return json as IAPIResp<IRespExam[]>;
+        return {
+            ...json,
+            data: json.data.map((e) => ({
+                group: gr,
+                name: e.disc.disc_name,
+                date: parse(`${e.date_sd} ${e.time_sd}`, 'yyyy-MM-dd HH:mm:ss', new Date()),
+                classroom: e.classroom,
+                teacher: e.teacher,
+            }))
+        } as IAPIResp<IExam[]>;
     }
 
     /*
     * Возвращает список факультетов
     * */
     static async instList() {
-        let json: IAPIResp<IRespInst[]> | undefined = (await this.get(`${process.env.KUBSTU_API}/timetable/inst-list`, opts)) as IAPIResp<IRespInst[]> | undefined;
+        let json = await this.get<IRespInst[]>(`${process.env.KUBSTU_API}/timetable/inst-list`, opts);
 
         if(!json?.isok) {
             console.log('[APIConvertor] Что-то не так!', json);
-
             return undefined;
         }
 
-        return json as IAPIResp<IRespInst[]>;
+        return json;
     }
 
     /*
     * Возвращает список групп
     * */
     static async groupsList(
-        ugod: number | string = new Date().getFullYear() - (new Date().getMonth() >= 6 ? 0 : 1),
+        ugod: number | string = getCurrentSemesterInfo().year,
         filter?: IGroupsListFilter,
     ) {
-        let json: IAPIResp<IRespGroup[]> | undefined = (await this.get(`${process.env.KUBSTU_API}/timetable/gr-list?ugod=${ugod}${filter?.inst_id ? `&inst_id=${filter.inst_id}` : ''}${filter?.kurs ? `&kurs=${filter.kurs}` : ''}`, opts)) as IAPIResp<IRespGroup[]> | undefined;
+        let json = await this.get<IRespGroup[]>(`${process.env.KUBSTU_API}/timetable/gr-list?ugod=${ugod}${filter?.inst_id ? `&inst_id=${filter.inst_id}` : ''}${filter?.kurs ? `&kurs=${filter.kurs}` : ''}`, opts);
 
         if(!json?.isok) {
             console.log('[APIConvertor] Что-то не так!', json, {ugod, filter});
-
             return undefined;
         }
-
-        if(!json.isok) return json;
         // По какой-то причине в API formaob_id=1 не работает, поэтому производим фильтрацию прямо тут
 
         if(filter?.foe) {
-            let f = filter.foe == 'ofo' ? [1] : [2, 3];
+            let f = filter.foe === 'ofo' ? [FoE.ofo] : [FoE.ozfo, FoE.zfo];
             json.data = json.data.filter((g) => f.includes(g.formaob_id));
         }
 
@@ -300,21 +313,22 @@ export async function parseCalendar(group: string, sem: string | number, ugod: s
         agent: new https.Agent({ rejectUnauthorized: false }),
     });
 
-    const root = parse(await res.text());
+    const root = parseHtml(await res.text());
 
-    const elm = root //.querySelector('.container');
+    const elm = root
     ?.querySelectorAll('p')
     .find((p) => p.text.includes('График занятий:'));
 
     if(!elm) return undefined;
 
-    let textDate = elm.innerHTML.trim().slice(16, 26);
+    let textDate = elm.innerHTML.trim().slice(16);
 
-    if(!textDate) return undefined;
+    if(!textDate || textDate === 'отсутствует') return undefined;
 
-    const [day, month, year] = textDate.split('.').map(Number);
+    let [startDateStr, endDateStr] = textDate.split(' - ');
 
-    let date = new Date(year, month - 1, day);
+    let startDate = parse(startDateStr, 'dd.MM.yyyy', new Date());
+    let endDate = parse(endDateStr, 'dd.MM.yyyy', new Date());
 
-    return isNaN(date.getTime()) ? undefined : date;
+    return isNaN(startDate.getTime()) || isNaN(endDate.getTime()) ? undefined : [startDate, endDate];
 }

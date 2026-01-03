@@ -1,3 +1,5 @@
+import { startOfWeek, differenceInWeeks } from 'date-fns';
+
 // Нужно для самих кнопок и чтобы они нажимались
 export const daysOdd = ['Нечёт Пн', 'Нечёт Вт', 'Нечёт Ср', 'Нечёт Чт', 'Нечёт Пт', 'Нечёт Сб'];
 export const daysEven = ['Чёт Пн', 'Чёт Вт', 'Чёт Ср', 'Чёт Чт', 'Чёт Пт', 'Чёт Сб'];
@@ -19,7 +21,7 @@ export const faculties = {
 };
 
 /**
-* Возвращает понедельник заданной недели. Если заданная неделя это воскресенье, то вернёт следующий понедельник.
+* Возвращает понедельник заданной недели. Если день заданной недели это воскресенье, то вернёт следующий понедельник.
 */
 export function getMonday(oldDate: Date) {
     let date = new Date(oldDate);
@@ -30,21 +32,10 @@ export function getMonday(oldDate: Date) {
 /*
 * Вернёт номер недели от стартовой
 */
-export function weekNumber(startDate: Date, date: Date = new Date()) {
-    // Устанавливаем даты в понедельник
-    let mondayDate = new Date(date);
-    mondayDate.setHours(0, 0, 0, 0);
-    mondayDate.setDate(date.getDate() - (date.getDay() || 7) + 1);
-
-    let mondayStartDate = new Date(startDate);
-    mondayStartDate.setHours(0, 0, 0, 0);
-    mondayStartDate.setDate(startDate.getDate() - (startDate.getDay() || 7) + 1);
-
-    // Находим разницу между данной датой и датой первого дня недели в мс.
-    let diff = mondayDate.valueOf() - mondayStartDate.valueOf();
-
-    // Переводим в недели, округляем в большую сторону и выводим.
-    return Math.round(diff / (1000 * 60 * 60 * 24 * 7)) + 1;
+export function weekNumber(startDate: Date, date: Date = new Date()): number {
+    const start = startOfWeek(startDate, { weekStartsOn: 1 });
+    const end = startOfWeek(date, { weekStartsOn: 1 });
+    return differenceInWeeks(end, start) + 1;
 }
 
 /**
@@ -60,11 +51,12 @@ export function genToken(name: string, inst_id: number) {
     return `${name}:${inst_id}:${token}`;
 }
 
-export default {
-    daysOdd,
-    daysEven,
-    days,
-    weekNumber,
-    genToken,
-    getMonday,
-};
+/**
+ * Возвращает текущий учебный год и семестр.
+ */
+export function getCurrentSemesterInfo() {
+    const now = new Date();
+    const year = now.getFullYear() - (now.getMonth() >= 6 ? 0 : 1);
+    const semester = now.getMonth() > 5 ? 1 : 2;
+    return { year, semester };
+}

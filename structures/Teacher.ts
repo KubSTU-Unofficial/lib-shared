@@ -1,4 +1,7 @@
 import LessonModel, { ILessonSchema } from '../models/LessonModel.js';
+import { getCurrentSemesterInfo } from '../lib/Utils.js';
+
+const CACHE_TTL = 1000 * 60 * 60; // 1 час
 
 export default class BaseTeacher {
     cachedFullRawSchedule?: {
@@ -6,30 +9,22 @@ export default class BaseTeacher {
         updateDate: Date;
     };
 
-    constructor(public name: string) {}
+    constructor(public name: string) { }
 
     mergeStreamLessons(lessons: ILessonSchema[]): ILessonSchema[] {
         const result: ILessonSchema[] = [];
         const seen = new Map<string, ILessonSchema>();
 
-        for(const lesson of lessons) {
-            if(!lesson.isStream) {
+        for (const lesson of lessons) {
+            if (!lesson.isStream) {
                 result.push(lesson);
                 continue;
             }
 
-            // Ключ — сериализованные некоторые свойства
-            const key = JSON.stringify({
-                day: lesson.day,
-                number: lesson.number,
-                name: lesson.name,
-                type: lesson.type,
-                classroom: lesson.classroom,
-                percentOfGroup: lesson.percentOfGroup,
-                isDistant: lesson.isDistant,
-            });
+            // Ключ - это конкатенация свойств, определяющих уникальный урок
+            const key = `${lesson.timing.weeks?.dayOfWeek}-${lesson.timing.weeks?.type}-${lesson.timing.lessonNumber}-${lesson.name}-${lesson.type}`;
 
-            if(seen.has(key)) {
+            if (seen.has(key)) {
                 const existing = seen.get(key)!;
                 existing.group += ` | ${lesson.group}`;
             } else seen.set(key, { ...lesson });
@@ -43,16 +38,24 @@ export default class BaseTeacher {
      * Берёт расписание с БД
      * Если в БД расписания нет, возвращает undefined
      */
-    async getFullRawSchedule(): Promise<ILessonSchema[] | undefined> {
-        let date = new Date();
-
-        if(this.cachedFullRawSchedule && date.valueOf() - this.cachedFullRawSchedule.updateDate.valueOf() < 1000 * 60 * 60 * 4)
+    async getFullRawSchedule(
+        year: number = getCurrentSemesterInfo().year,
+        sem: number = getCurrentSemesterInfo().semester
+    ): Promise<ILessonSchema[] | undefined> {
+        // 1. Проверяем кэш
+        if (this.cachedFullRawSchedule && (new Date().getTime() - this.cachedFullRawSchedule.updateDate.getTime()) < CACHE_TTL)
             return this.cachedFullRawSchedule.data;
 
-        let schedule: ILessonSchema[] = await LessonModel.find({ teacherName: this.name }).lean().exec();
+        // 2. Получаем данные из БД // FIXME:
+        let schedule: ILessonSchema[] = await LessonModel.find({
+            teacherName: this.name,
+            "timing.year": year,
+            "timing.semester": sem
+        }).lean().exec();
 
-        if(!schedule) return undefined;
+        if (!schedule || schedule.length === 0) return undefined;
 
+        // 3. Обрабатываем и кэшируем
         schedule = this.mergeStreamLessons(schedule);
 
         this.cachedFullRawSchedule = {
@@ -63,9 +66,7 @@ export default class BaseTeacher {
         return schedule;
     }
 
-    static fromArray(arr: string[]) {
-        // Возможно поиск самой большой строки - это не самый правильный вариант, но самый простой и, вроде бы, логичный.
-        // У кого инициалы могут быть больше полного ФИО?
+    static fromArray(arr: string[]): BaseTeacher {
         return new BaseTeacher(arr.reduce((a, b) => (b.length > a.length ? b : a), ''));
     }
 }

@@ -20,7 +20,6 @@ const schema = new mongoose.Schema(
         },
         token: {
             type: String,
-            default: undefined,
         },
         showSettings: {
             type: Boolean,
@@ -33,7 +32,7 @@ const schema = new mongoose.Schema(
         lastActivity: {
             type: Date,
             default: new Date(),
-        },
+        }
     },
     { collection: 'tgUsers' },
 );
