@@ -17,7 +17,9 @@ export default class BaseOGroup extends BaseGroup {
 
             year = groupInfo.year;
             sem = groupInfo.sem;
-        }
+        } else if (year && sem) {
+            lessonsPeriod = await parseCalendar(this.name, sem, year);
+        } else throw Error("OGroup.getTimetableFromAPI: Нельзя указать год и не указать семестр")
 
         const resp = await APIConvertor.ofo(this.name, year, sem);
 
