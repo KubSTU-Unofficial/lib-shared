@@ -91,13 +91,13 @@ export default abstract class BaseGroup {
         gi = this.getGroupInfoFromCache(true);
 
         if (gi) {
-            this.sendGroupInfoToCache(gi, new Date(Date.now() + 1000 * 60 * 60 * 24 * 1))
+            this.sendGroupInfoToCache(gi, new Date(Date.now() + 1000 * 60 * 60 * 24));
             return gi;
         }
 
         gi = this.getGroupInfoDefault();
 
-        this.sendGroupInfoToCache(gi, new Date(Date.now() + 1000 * 60 * 60 * 24 * 1))
+        this.sendGroupInfoToCache(gi)
 
         return gi;
     }
@@ -125,6 +125,8 @@ export default abstract class BaseGroup {
     }
 
     getGroupInfoFromCache(ignoreTTL = false): IGroupInfo | undefined {
+        console.log(this.cache.groupInfoTTL);
+
         if (!this.cache.groupInfoTTL || (this.cache.groupInfoTTL < new Date() && !ignoreTTL)) return undefined;
 
         return {
@@ -167,7 +169,7 @@ export default abstract class BaseGroup {
         this.cache.sem = data.sem;
         this.cache.year = data.year;
         if (data.lessonsPeriod) this.cache.lessonsPeriod = data.lessonsPeriod;
-        this.cache.groupInfoTTL = ttl ?? data.lessonsPeriod?.[1] ?? new Date(Date.now().valueOf() + 1000 * 60 * 60 * 24 * 7);
+        this.cache.groupInfoTTL = ttl ?? data.groupInfoTTL ?? data.lessonsPeriod?.[1] ?? new Date(Date.now().valueOf() + 1000 * 60 * 60 * 24 * 7);
     }
 
     async getFullTimetable(): Promise<ILessonSchema[] | undefined>;
