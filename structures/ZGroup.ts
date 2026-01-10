@@ -8,6 +8,13 @@ export default class BaseZGroup extends BaseGroup {
     async getTimetableFromAPI(year: number, sem: number): Promise<ILessonSchema[] | undefined>
 
     async getTimetableFromAPI(year?: number, sem?: number): Promise<ILessonSchema[] | undefined> {
+        if (!year && !sem) {
+            let groupInfo = await this.getGroupInfo();
+
+            year = groupInfo.year;
+            sem = groupInfo.sem;
+        }
+
         const resp = await APIConvertor.zfo(this.name, year, sem);
 
         if (!resp?.isok) return undefined;
