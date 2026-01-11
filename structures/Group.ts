@@ -125,8 +125,6 @@ export default abstract class BaseGroup {
     }
 
     getGroupInfoFromCache(ignoreTTL = false): IGroupInfo | undefined {
-        console.log(this.cache.groupInfoTTL);
-
         if (!this.cache.groupInfoTTL || (this.cache.groupInfoTTL < new Date() && !ignoreTTL)) return undefined;
 
         return {
@@ -323,11 +321,7 @@ export default abstract class BaseGroup {
         return /^[^\\-]+-(АЗ|З|ОЗ)[^-]*-/.test(name);
     }
 
-    async isZFOGroup(): Promise<boolean> {
-        if (this.FoE) return this.FoE !== FoE.ofo;
-
-        return BaseGroup.isZFOGroup(this.name);
-    }
+    abstract isZFOGroup(): boolean;
 
     // async getToken(): Promise<string> {
     //     let groupInfo = await GroupModel.findOne({ name: this.name, inst_id: this.instId }).exec();

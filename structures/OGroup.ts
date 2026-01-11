@@ -115,4 +115,8 @@ export default class BaseOGroup extends BaseGroup {
 
         return timetable
     }
+
+    isZFOGroup(): boolean {
+        return false;
+    }
 }
