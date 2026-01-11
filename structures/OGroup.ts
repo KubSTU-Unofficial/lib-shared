@@ -1,9 +1,9 @@
-import BaseGroup, { IGroupInfo } from './Group.js';
+import Group, { IGroupInfo } from './Group.js';
 import { ILessonSchema } from '../models/LessonModel.js';
 import APIConvertor, { parseCalendar } from '../lib/APIConvertor.js';
 
 
-export default class BaseOGroup extends BaseGroup {
+export default class BaseOGroup extends Group {
 
     async getTimetableFromAPI(): Promise<ILessonSchema[] | undefined>
     async getTimetableFromAPI(year: number, sem: number): Promise<ILessonSchema[] | undefined>

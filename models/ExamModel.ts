@@ -6,6 +6,8 @@ export interface IExam {
     date: Date;
     classroom: string;
     teacher: string;
+    year: number;
+    semester: number;
 }
 
 const schema = new mongoose.Schema<IExam, {}, {}, {}, SchemaDefinitionType<IExam>>(
@@ -15,6 +17,8 @@ const schema = new mongoose.Schema<IExam, {}, {}, {}, SchemaDefinitionType<IExam
         date: { type: Date, required: true },
         classroom: { type: String, required: true },
         teacher: { type: String, required: true },
+        year: { type: Number, required: true },
+        semester: { type: Number, require: true },
     },
     { collection: 'exams' },
 );

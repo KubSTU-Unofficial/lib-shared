@@ -41,15 +41,15 @@ export function weekNumber(startDate: Date, date: Date = new Date()): number {
 /**
 * Генерирует 32-символьный токен
 */
-export function genToken(name: string, inst_id: number) {
-    let chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890'.split('');
-    let token = '';
-    for (let i = 0; i < 32; i++) {
-        let j = Math.floor(Math.random() * (chars.length - 1));
-        token += chars[j];
-    }
-    return `${name}:${inst_id}:${token}`;
-}
+// export function genToken(name: string, inst_id: number) {
+//     let chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890'.split('');
+//     let token = '';
+//     for (let i = 0; i < 32; i++) {
+//         let j = Math.floor(Math.random() * (chars.length - 1));
+//         token += chars[j];
+//     }
+//     return `${name}:${inst_id}:${token}`;
+// }
 
 /**
  * Возвращает текущий учебный год и семестр.

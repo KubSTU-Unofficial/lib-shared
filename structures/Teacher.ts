@@ -1,9 +1,9 @@
 import LessonModel, { ILessonSchema } from '../models/LessonModel.js';
-import { getCurrentSemesterInfo } from '../lib/Utils.js';
+// import { getCurrentSemesterInfo } from '../lib/Utils.js';
 import { format } from 'date-fns';
 import { LRUCache } from "lru-cache";
 
-const CACHE_TTL = 1000 * 60 * 60; // 1 час
+// const CACHE_TTL = 1000 * 60 * 60; // 1 час
 
 export default class BaseTeacher {
     cachedFullRawSchedule?: {
@@ -101,39 +101,41 @@ export default class BaseTeacher {
         this.cache.timetable.set(format(date, "dd-MM-yyyy"), timetable);
     }
 
+    // TODO: Написать метод получения расписания на определённую неделю
+
     /**
      * Берёт расписание с БД
      * Если в БД расписания нет, возвращает undefined
      */
-    async getFullRawSchedule(
-        year: number = getCurrentSemesterInfo().year,
-        sem: number = getCurrentSemesterInfo().semester
-    ): Promise<ILessonSchema[] | undefined> {
-        // 1. Проверяем кэш
-        if (this.cachedFullRawSchedule && (new Date().getTime() - this.cachedFullRawSchedule.updateDate.getTime()) < CACHE_TTL)
-            return this.cachedFullRawSchedule.data;
-
-        // 2. Получаем данные из БД // FIXME:
-        let schedule: ILessonSchema[] = await LessonModel.find({
-            teacherName: this.name,
-            "timing.year": year,
-            "timing.semester": sem
-        }).lean().exec();
-
-        if (!schedule || schedule.length === 0) return undefined;
-
-        // 3. Обрабатываем и кэшируем
-        schedule = this.mergeStreamLessons(schedule);
-
-        this.cachedFullRawSchedule = {
-            data: schedule,
-            updateDate: new Date(),
-        };
-
-        return schedule;
-    }
-
-    static fromArray(arr: string[]): BaseTeacher {
-        return new BaseTeacher(arr.reduce((a, b) => (b.length > a.length ? b : a), ''));
-    }
+    // async getFullRawSchedule(
+    //     year: number = getCurrentSemesterInfo().year,
+    //     sem: number = getCurrentSemesterInfo().semester
+    // ): Promise<ILessonSchema[] | undefined> {
+    //     // 1. Проверяем кэш
+    //     if (this.cachedFullRawSchedule && (new Date().getTime() - this.cachedFullRawSchedule.updateDate.getTime()) < CACHE_TTL)
+    //         return this.cachedFullRawSchedule.data;
+    //
+    //     // 2. Получаем данные из БД
+    //     let schedule: ILessonSchema[] = await LessonModel.find({
+    //         teacherName: this.name,
+    //         "timing.year": year,
+    //         "timing.semester": sem
+    //     }).lean().exec();
+    //
+    //     if (!schedule || schedule.length === 0) return undefined;
+    //
+    //     // 3. Обрабатываем и кэшируем
+    //     schedule = this.mergeStreamLessons(schedule);
+    //
+    //     this.cachedFullRawSchedule = {
+    //         data: schedule,
+    //         updateDate: new Date(),
+    //     };
+    //
+    //     return schedule;
+    // }
+    //
+    // static fromArray(arr: string[]): BaseTeacher {
+    //     return new BaseTeacher(arr.reduce((a, b) => (b.length > a.length ? b : a), ''));
+    // }
 }

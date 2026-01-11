@@ -85,5 +85,6 @@ export const lessonSchema = new mongoose.Schema<ILessonSchema, {}, {}, {}, Schem
 lessonSchema.index({ group: 1 });
 lessonSchema.index({ teacherName: 1 });
 lessonSchema.index({ classroom: 1 });
+lessonSchema.index({ teacherName: "text" });
 
 export default mongoose.model('lessons', lessonSchema);

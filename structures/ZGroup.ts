@@ -1,8 +1,8 @@
-import BaseGroup, { IGroupInfo } from './Group.js';
+import Group, { IGroupInfo } from './Group.js';
 import { ILessonSchema } from '../models/LessonModel.js';
 import APIConvertor from '../lib/APIConvertor.js';
 
-export default class BaseZGroup extends BaseGroup {
+export default class BaseZGroup extends Group {
 
     async getTimetableFromAPI(): Promise<ILessonSchema[] | undefined>
     async getTimetableFromAPI(year: number, sem: number): Promise<ILessonSchema[] | undefined>

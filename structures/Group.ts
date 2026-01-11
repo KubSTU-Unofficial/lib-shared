@@ -1,7 +1,9 @@
-import { FoE, LessonTypes } from '../lib/APIConvertor.js';
-import LessonModel, { ILessonSchema } from '../models/LessonModel.js';
-import GroupModel from '../models/GroupModel.js';
-// import { genToken } from '../lib/Utils.js';
+import { FoE, LessonTypes } from '../lib/APIConvertor';
+import LessonModel, { ILessonSchema } from '../models/LessonModel';
+import GroupModel from '../models/GroupModel';
+import APIConvertor from '../lib/APIConvertor';
+import ExamModel, { IExam } from '../models/ExamModel';
+// import { genToken } from '../lib/Utils';
 
 export interface IGroupInfo {
     sem: number;
@@ -10,7 +12,7 @@ export interface IGroupInfo {
     groupInfoTTL: Date;
 }
 
-export default abstract class BaseGroup {
+export default abstract class Group {
     kurs: number;
 
     cache: {
@@ -22,12 +24,9 @@ export default abstract class BaseGroup {
         lessonsPeriod?: Date[];
         groupInfoTTL?: Date;
 
-        exams?: undefined;
+        exams?: IExam[];
         examsTTL?: Date;
     } = {};
-
-    // Нужно, чтобы не выключаться, пока есть запросы на обновление в БД
-    pendingUpdate?: Promise<unknown>;
 
     // Форма обучения
     FoE?: FoE;
@@ -170,6 +169,8 @@ export default abstract class BaseGroup {
         this.cache.groupInfoTTL = ttl ?? data.groupInfoTTL ?? data.lessonsPeriod?.[1] ?? new Date(Date.now().valueOf() + 1000 * 60 * 60 * 24 * 7);
     }
 
+    abstract getTimetable(opts?: { year?: number, sem?: number, date?: Date, day?: number, week?: boolean }): Promise<ILessonSchema[] | undefined>
+
     async getFullTimetable(): Promise<ILessonSchema[] | undefined>;
     async getFullTimetable(year: number, sem: number): Promise<ILessonSchema[] | undefined>;
 
@@ -279,6 +280,81 @@ export default abstract class BaseGroup {
     sendTimetableToCache(data: ILessonSchema[], ttl?: Date) {
         this.cache.timetable = data;
         this.cache.timetableTTL = ttl ?? new Date(Date.now() + 1000 * 60 * 60 * 24);
+    }
+
+    async getExams() {
+        return this.getExamsFromCache() ?? await this.getExamsFromApi() ?? await this.getExamsFromDb() ?? this.getExamsFromCache(true);
+    }
+
+    async getAndStoreExams() {
+        let e = this.getExamsFromCache();
+        if (e) return e;
+
+        e = await this.getExamsFromApi();
+        if (e) {
+            this.sendExamsToDb(e);
+            this.sendExamsToCache(e);
+
+            return e;
+        }
+
+        e = await this.getExamsFromDb();
+        if (e) {
+            this.sendExamsToCache(e);
+
+            return e;
+        }
+
+        return this.getExamsFromCache(true);
+    }
+
+    async getExamsFromApi() {
+        let groupInfo = await this.getAndStoreGroupInfo();
+        if (!groupInfo) return undefined;
+
+        let year = groupInfo.year;
+        let sem = groupInfo.sem;
+        let result = await APIConvertor.exam(this.name, year, sem);
+
+        if (!result?.isok || !result?.data) return undefined;
+
+        return result.data;
+    }
+
+    async getExamsFromDb() {
+        let groupInfo = await this.getAndStoreGroupInfo();
+        if (!groupInfo) return undefined;
+
+        let result = await ExamModel.find({ group: this.name, semester: groupInfo.sem, year: groupInfo.year }).lean().exec();
+        if (!result) return undefined;
+
+        return result as IExam[];
+    }
+
+    getExamsFromCache(ignoreTTL = false) {
+        if (!this.cache.examsTTL || (this.cache.examsTTL < new Date() && !ignoreTTL)) return undefined;
+
+        return this.cache.exams;
+    }
+
+    async sendExamsToDb(newExams: IExam[]) {
+        if (!newExams.length) return;
+
+        let year = newExams[0].year;
+        let semester = newExams[0].semester;
+
+        // TODO: Для большей надежности в будущем это стоит обернуть в транзакцию
+        try {
+            await ExamModel.deleteMany({ group: this.name, year, semester }).exec();
+            await LessonModel.insertMany(newExams);
+        } catch (error) {
+            console.error(`Failed to update exams for group ${this.name}:`, error);
+        }
+    }
+
+    sendExamsToCache(data: IExam[], ttl?: Date) {
+        this.cache.exams = data;
+        this.cache.examsTTL = ttl ?? new Date(Date.now() + 1000 * 60 * 60 * 24 * 7); // На неделю
     }
 
     async getRawTeachersList(): Promise<string[]> {
