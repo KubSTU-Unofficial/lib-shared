@@ -346,7 +346,7 @@ export default abstract class Group {
         // TODO: Для большей надежности в будущем это стоит обернуть в транзакцию
         try {
             await ExamModel.deleteMany({ group: this.name, year, semester }).exec();
-            await LessonModel.insertMany(newExams);
+            await ExamModel.insertMany(newExams);
         } catch (error) {
             console.error(`Failed to update exams for group ${this.name}:`, error);
         }
