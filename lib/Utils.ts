@@ -18,7 +18,13 @@ export const faculties = {
     'ПОдИО': 34,
     'НПИ': 50,
     'АМТИ': 52,
-};
+} as const;
+
+export const facultiesReverse = Object.freeze(
+    Object.fromEntries(
+        Object.entries(faculties).map(([name, id]) => [id, name])
+    )
+) as Record<number, keyof typeof faculties>;
 
 /**
 * Возвращает понедельник заданной недели. Если день заданной недели это воскресенье, то вернёт следующий понедельник.
