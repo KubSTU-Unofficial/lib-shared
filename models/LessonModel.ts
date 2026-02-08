@@ -18,8 +18,8 @@ export interface ILessonSchema {
         weeks?: {
             from: number;       // С какой недели
             to: number;         // По какую
-            startDate?: Date;   // С какой даты
-            endDate?: Date;     // По какую
+            startDate: Date;   // С какой даты
+            endDate: Date;     // По какую
 
             type: boolean;      // Тип недели
             dayOfWeek: number;  // День недели

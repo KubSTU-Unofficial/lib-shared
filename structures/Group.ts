@@ -1,8 +1,7 @@
-import { FoE, LessonTypes } from '../lib/APIConvertor';
-import LessonModel, { ILessonSchema } from '../models/LessonModel';
-import GroupModel from '../models/GroupModel';
-import APIConvertor from '../lib/APIConvertor';
-import ExamModel, { IExam } from '../models/ExamModel';
+import APIConvertor, { FoE, IGroupShort, LessonTypes } from '../lib/APIConvertor.js';
+import LessonModel, { ILessonSchema } from '../models/LessonModel.js';
+import GroupModel from '../models/GroupModel.js';
+import ExamModel, { IExam } from '../models/ExamModel.js';
 // import { genToken } from '../lib/Utils';
 
 export interface IGroupInfo {
@@ -31,6 +30,11 @@ export default abstract class Group {
     // Форма обучения
     FoE?: FoE;
 
+    static cache: {
+        groupList?: IGroupShort[],
+        groupListTTL?: Date,
+    } = {}
+
     static lessonsTime: string[][] = [
         ['wh', 'at?'],
         ['8:00', '9:30'],
@@ -57,6 +61,59 @@ export default abstract class Group {
         await this.getAndStoreGroupInfo();
         await this.getAndStoreFullTimetable();
         return this;
+    }
+
+    static async getAndStoreGroupsList() {
+        let gl = this.getGroupsListFromCache();
+
+        if (gl) return gl;
+
+        gl = await this.getGroupsListFromAPI();
+
+        if (gl) {
+            this.sendGroupsListToCache(gl);
+
+            return gl;
+        }
+
+        gl = await this.getGroupsListFromDb();
+
+        if (gl) {
+            this.sendGroupsListToCache(gl);
+
+            return gl;
+        }
+
+        return this.getGroupsListFromCache(true);
+    }
+
+    static async getGroupsList() {
+        return this.getGroupsListFromCache() ?? await this.getGroupsListFromAPI() ?? await this.getGroupsListFromDb() ?? this.getGroupsListFromCache(true);
+    }
+
+    static async getGroupsListFromAPI() {
+        let list = await APIConvertor.groupsList();
+
+        if (!list?.isok || !list.data?.length) return undefined;
+
+        return list.data;
+    }
+
+    static getGroupsListFromCache(ignoreTTL: boolean = false) {
+        if (!this.cache.groupListTTL || (this.cache.groupListTTL < new Date() && !ignoreTTL)) return undefined;
+
+        return this.cache.groupList;
+    }
+
+    static sendGroupsListToCache(data: IGroupShort[], ttl?: Date) {
+        this.cache.groupList = data;
+        this.cache.groupListTTL = ttl ?? new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)
+    }
+
+    static async getGroupsListFromDb() {
+        return undefined;
+        // TODO: если просто отправлять список групп - будет отправляться лишняя инфа + будут отправляться те группы, которые уже закончили обучение
+        // Чтобы исправить, нужно для начала изменить модель хранения группы, потом способ заполнения БД.
     }
 
     /*
@@ -101,8 +158,57 @@ export default abstract class Group {
         return gi;
     }
 
-    abstract getGroupInfoFromAPI(): Promise<IGroupInfo | undefined>
+    abstract getLessonsPeriodFromTimetable(timetable: ILessonSchema[] | undefined): Date[] | undefined;
 
+    /*
+     * Получает текущий график занятий, год и семестр
+     * */
+    async getGroupInfoFromAPI(): Promise<IGroupInfo | undefined> {
+        let now = new Date();
+        let defaultYear = now.getFullYear() - (now.getMonth() >= 6 ? 0 : 1);
+        let defaultSem = now.getMonth() > 5 ? 1 : 2;
+
+        let lessonsPeriod = this.getLessonsPeriodFromTimetable(await this.getTimetableFromAPI(defaultYear, defaultSem));
+
+        if (!lessonsPeriod || lessonsPeriod[0] == lessonsPeriod[1]) return undefined; // 1 день занятий, прикольно
+
+        let out: IGroupInfo = {
+            sem: defaultSem,
+            year: defaultYear,
+            lessonsPeriod,
+            groupInfoTTL: lessonsPeriod[1],
+        }
+
+        if (lessonsPeriod[1] < now) {
+            let nextSem = out.sem == 1 ? 2 : 1;
+            let nextYear = out.sem == 1 ? out.year : out.year + 1;
+            let nextLessonsPeriod = this.getLessonsPeriodFromTimetable(await this.getTimetableFromAPI(nextYear, nextSem));
+
+            if (nextLessonsPeriod) {
+                if (nextLessonsPeriod[0].valueOf() - 1000 * 60 * 60 * 24 * 7 < now.valueOf()) {
+                    out.sem = nextSem;
+                    out.year = nextYear;
+                    out.lessonsPeriod = nextLessonsPeriod;
+                    out.groupInfoTTL = nextLessonsPeriod[1];
+                } else {
+                    out.groupInfoTTL = new Date(nextLessonsPeriod[0].valueOf() - 1000 * 60 * 60 * 24 * 7);
+                }
+            }
+        }
+
+        if (now.valueOf() < lessonsPeriod[0].valueOf() - 1000 * 60 * 60 * 24 * 7) {
+            let pastSem = out.sem == 1 ? 2 : 1;
+            let pastYear = out.sem == 1 ? out.year - 1 : out.year;
+            let pastLessonsPeriod = this.getLessonsPeriodFromTimetable(await this.getTimetableFromAPI(pastYear, pastSem));
+
+            out.sem = pastSem;
+            out.year = pastYear;
+            out.lessonsPeriod = pastLessonsPeriod!; // Меня в принципе устраивает и undefined тут
+            out.groupInfoTTL = pastLessonsPeriod ? new Date(lessonsPeriod[0].valueOf() - 1000 * 60 * 60 * 24 * 7) : new Date(now.valueOf() + 1000 * 60 * 60 * 12); // oднако, undefined всё же закеширую на пол дня
+        }
+
+        return out;
+    }
     /*
      * Получает информацию о группе (семестр, год, период) из БД
      * */

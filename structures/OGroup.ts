@@ -1,6 +1,6 @@
-import Group, { IGroupInfo } from './Group.js';
+import Group from './Group.js';
 import { ILessonSchema } from '../models/LessonModel.js';
-import APIConvertor, { parseCalendar } from '../lib/APIConvertor.js';
+import APIConvertor from '../lib/APIConvertor.js';
 
 
 export default class BaseOGroup extends Group {
@@ -9,86 +9,37 @@ export default class BaseOGroup extends Group {
     async getTimetableFromAPI(year: number, sem: number): Promise<ILessonSchema[] | undefined>
 
     async getTimetableFromAPI(year?: number, sem?: number): Promise<ILessonSchema[] | undefined> {
-        let lessonsPeriod: Date[] | undefined;
-
         if (!year && !sem) {
             let groupInfo = await this.getGroupInfo();
-            lessonsPeriod = groupInfo.lessonsPeriod;
 
             year = groupInfo.year;
             sem = groupInfo.sem;
-        } else if (year && sem) {
-            lessonsPeriod = await parseCalendar(this.name, sem, year);
-        } else throw Error("OGroup.getTimetableFromAPI: Нельзя указать год и не указать семестр")
+        } else if (!year !== !sem) throw Error("OGroup.getTimetableFromAPI: Нельзя указать год и не указать семестр")
 
         const resp = await APIConvertor.ofo(this.name, year, sem);
 
         if (!resp?.isok) return undefined;
 
-        // Обогащаем данные датами начала/конца недель
-        if (lessonsPeriod) {
-            resp.data.forEach((elm) => {
-                if (elm.timing.weeks) {
-                    const fromOffset = 1000 * 60 * 60 * 24 * 7 * (elm.timing.weeks.from - 1);
-                    const toOffset = 1000 * 60 * 60 * 24 * 7 * (elm.timing.weeks.to - 1);
-
-                    elm.timing.weeks.startDate = new Date(lessonsPeriod[0].valueOf() + fromOffset);
-                    elm.timing.weeks.endDate = new Date(lessonsPeriod[0].valueOf() + toOffset);
-                }
-            });
-        }
-
         return resp.data;
     }
 
-    /*
-     * Получает текущий график занятий, год и семестр
-     * */
-    async getGroupInfoFromAPI() {
-        let now = new Date();
-        let defaultYear = now.getFullYear() - (now.getMonth() >= 6 ? 0 : 1);
-        let defaultSem = now.getMonth() > 5 ? 1 : 2;
+    getLessonsPeriodFromTimetable(timetable: ILessonSchema[] | undefined) {
+        if (!timetable?.length) return undefined;
 
-        let lessonsPeriod = await parseCalendar(this.name, defaultSem, defaultYear); // Получения графика (с какого по какую дату)
+        let startDate = timetable[0].timing.weeks!.startDate;
+        let endDate = timetable[0].timing.weeks!.endDate;
 
-        if (!lessonsPeriod) return undefined;
+        for (const { timing } of timetable) {
+            if (!timing.weeks) continue;
 
-        let out: IGroupInfo = {
-            sem: defaultSem,
-            year: defaultYear,
-            lessonsPeriod,
-            groupInfoTTL: lessonsPeriod[1],
+            const timeStart = timing.weeks.startDate.getTime();
+            const timeEnd = timing.weeks.endDate.getTime();
+
+            if (timeStart < startDate.getTime()) startDate = timing.weeks.startDate;
+            if (timeEnd > endDate.getTime()) endDate = timing.weeks.endDate;
         }
 
-        if (lessonsPeriod[1] < now) {
-            let nextSem = out.sem == 1 ? 2 : 1;
-            let nextYear = out.sem == 1 ? out.year : out.year + 1;
-            let nextLessonsPeriod = await parseCalendar(this.name, nextSem, nextYear);
-
-            if (nextLessonsPeriod) {
-                if (nextLessonsPeriod[0].valueOf() - 1000 * 60 * 60 * 24 * 7 < now.valueOf()) {
-                    out.sem = nextSem;
-                    out.year = nextYear;
-                    out.lessonsPeriod = nextLessonsPeriod;
-                    out.groupInfoTTL = nextLessonsPeriod[1];
-                } else {
-                    out.groupInfoTTL = new Date(nextLessonsPeriod[0].valueOf() - 1000 * 60 * 60 * 24 * 7);
-                }
-            }
-        }
-
-        if (now.valueOf() < lessonsPeriod[0].valueOf() - 1000 * 60 * 60 * 24 * 7) {
-            let pastSem = out.sem == 1 ? 2 : 1;
-            let pastYear = out.sem == 1 ? out.year - 1 : out.year;
-            let pastLessonsPeriod = await parseCalendar(this.name, pastSem, pastYear);
-
-            out.sem = pastSem;
-            out.year = pastYear;
-            out.lessonsPeriod = pastLessonsPeriod!; // Меня в принципе устраивает и undefined тут
-            out.groupInfoTTL = pastLessonsPeriod ? new Date(lessonsPeriod[0].valueOf() - 1000 * 60 * 60 * 24 * 7) : new Date(now.valueOf() + 1000 * 60 * 60 * 12); // однако, undefined всё же закеширую на пол дня
-        }
-
-        return out;
+        return [startDate, endDate];
     }
 
     async getTimetable(opts: { year?: number, sem?: number, date?: Date, day?: number, week?: boolean } = {}): Promise<ILessonSchema[] | undefined> {

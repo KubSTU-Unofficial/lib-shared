@@ -1,6 +1,20 @@
 import mongoose, { SchemaDefinitionType } from 'mongoose';
 import { FoE } from '../lib/APIConvertor.js';
 
+// TODO: 
+interface newIGroup {
+    name: string;
+    fakId: number;
+    FoE: FoE;
+    isActive: boolean;
+    timing?: {
+        lessonsPeriod?: Date[];
+        sem: number;
+        year: number;
+    }
+    token?: string;
+}
+
 export interface IGroupSchema {
     name: string;
     fakId: number;

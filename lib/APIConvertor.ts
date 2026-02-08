@@ -1,4 +1,4 @@
-import { parse as parseHtml } from 'node-html-parser';
+// import { parse as parseHtml } from 'node-html-parser';
 import { ILessonSchema } from '../models/LessonModel.js';
 import { IExam } from '../models/ExamModel.js';
 import { parse } from 'date-fns';
@@ -35,6 +35,10 @@ export interface IRespBasePara {
 }
 
 export interface IRespOFOPara extends IRespBasePara {
+    graph_aud: {
+        datestart: string;
+        dateend: string;
+    }
     nedtype: {
         nedtype_id: number;
         nedtype_name: string;
@@ -79,6 +83,12 @@ interface IRespGroup {
     kurs: number;
 }
 
+export interface IGroupShort {
+    name: string;
+    fakId: number;
+    FoE: FoE;
+}
+
 export enum FoE { // Form Of Education
     ofo = 1,
     ozfo,
@@ -107,7 +117,6 @@ const opts = {
     headers: {
         'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
     },
-    tls: { rejectUnauthorized: false },
 };
 
 export default class APIConvertor {
@@ -115,13 +124,48 @@ export default class APIConvertor {
     * Указание, работает ли API. Если false, класс автоматически отправляет undefined со всех методов
     * */
     static isAPIWorks = true;
-    private static isAPIWorksTimeout?: NodeJS.Timeout;
+    // private static isAPIWorksTimeout?: NodeJS.Timeout;
 
-    private static async get<T>(url: string, options: RequestInit = {}, n: number = 3): Promise<IAPIResp<T> | undefined> {
+    // Чтобы не закидывать API сотнями запросов в секунду были установлены ограничения
+    private static maxConcurrent = 8;
+    private static inFlight = 0;
+    private static queue: (() => void)[] = [];
+
+    private static async acquire() {
+        if (this.inFlight < this.maxConcurrent) {
+            this.inFlight++;
+            return;
+        }
+
+        await new Promise<void>(resolve => this.queue.push(resolve));
+        this.inFlight++;
+    }
+
+    private static release() {
+        this.inFlight--;
+        const next = this.queue.shift();
+        if (next) next();
+    }
+
+    static async get<T>(url: string, options: RequestInit = {}, n = 3) {
         if (!this.isAPIWorks) return undefined;
 
+        await this.acquire();
         try {
-            let resp = await fetch(url, options);
+            return await this._getInternal<T>(url, options, n);
+        } finally {
+            this.release();
+        }
+    }
+
+    private static async _getInternal<T>(url: string, options: RequestInit = {}, n: number = 3): Promise<IAPIResp<T> | undefined> {
+        if (!this.isAPIWorks) return undefined;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10_000); // 10 сек
+
+        try {
+            let resp = await fetch(url, { ...options, signal: controller.signal });
             let json: IAPIResp<T> = (await resp.json()) as IAPIResp<T>;
 
             if (!json?.isok && n > 0) return await this.get(url, options, n - 1);
@@ -129,6 +173,8 @@ export default class APIConvertor {
             return json;
         } catch (err) {
             if (n <= 0) {
+                console.log(`[APIConvertor] API DEAD!`);
+
                 console.log(err);
 
                 this.isAPIWorks = false;
@@ -138,6 +184,8 @@ export default class APIConvertor {
                 return undefined;
             }
             return await this.get(url, options, n - 1);
+        } finally {
+            clearTimeout(timeout);
         }
     }
 
@@ -171,6 +219,9 @@ export default class APIConvertor {
                     weeks: {
                         from: elm.ned_from,
                         to: elm.ned_to,
+
+                        startDate: new Date(elm.graph_aud.datestart), // Потенцивально опасный момент, если elm.graph_aud.datestart не будет задан или будет задан неправильно
+                        endDate: new Date(elm.graph_aud.dateend),
 
                         type: elm.nedtype.nedtype_id == 2,
                         dayOfWeek: elm.dayofweek.dayofweek_id,
@@ -290,40 +341,16 @@ export default class APIConvertor {
             console.log('[APIConvertor] [gr-list] Неправильный вывод', json, { ugod, filter });
             return undefined;
         }
-        // По какой-то причине в API formaob_id=1 не работает, поэтому производим фильтрацию прямо тут
+        // В API появилась фильтрация по formaob_id, но выбрать ЗФО там нельзя (тк есть ЗФО и ОЗФО, но вторые обрабатываются так же как и ЗФО). Проще отфильтровать тут
 
         if (filter?.foe) {
             let f = filter.foe === 'ofo' ? [FoE.ofo] : [FoE.ozfo, FoE.zfo];
             json.data = json.data.filter((g) => f.includes(g.formaob_id));
         }
 
-        return json;
+        return {
+            ...json,
+            data: json.data.map((e) => ({ name: e.name, fakId: e.inst_id, FoE: e.formaob_id as FoE }))
+        } as IAPIResp<IGroupShort[]>;
     }
-}
-
-/*
-Это (надеюсь) временная функция для получения графика с помощью парсинга
-*/
-export async function parseCalendar(group: string, sem: string | number, ugod: string | number) {
-    let url = `https://elkaf.kubstu.ru/timetable/default/time-table-student-ofo?iskiosk=0&gr=${group}&ugod=${ugod}&semestr=${sem}`;
-
-    const res = await fetchWithRestarts(url, opts);
-    const root = parseHtml(await res.text());
-
-    const elm = root
-        ?.querySelectorAll('p')
-        .find((p) => p.text.includes('График занятий:'));
-
-    if (!elm) return undefined;
-
-    let textDate = elm.innerHTML.trim().slice(16);
-
-    if (!textDate || textDate === 'отсутствует') return undefined;
-
-    let [startDateStr, endDateStr] = textDate.split(' - ');
-
-    let startDate = parse(startDateStr, 'dd.MM.yyyy', new Date());
-    let endDate = parse(endDateStr, 'dd.MM.yyyy', new Date());
-
-    return isNaN(startDate.getTime()) || isNaN(endDate.getTime()) ? undefined : [startDate, endDate];
 }
