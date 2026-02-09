@@ -168,7 +168,7 @@ export default class APIConvertor {
             let resp = await fetch(url, { ...options, signal: controller.signal });
             let json: IAPIResp<T> = (await resp.json()) as IAPIResp<T>;
 
-            if (!json?.isok && n > 0) return await this.get(url, options, n - 1);
+            if (!json?.isok && n > 0) return await this._getInternal(url, options, n - 1);
 
             return json;
         } catch (err) {
@@ -183,7 +183,7 @@ export default class APIConvertor {
 
                 return undefined;
             }
-            return await this.get(url, options, n - 1);
+            return await this._getInternal(url, options, n - 1);
         } finally {
             clearTimeout(timeout);
         }
