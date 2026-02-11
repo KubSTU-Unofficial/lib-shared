@@ -60,9 +60,9 @@ export default class BaseOGroup extends Group {
         if (hasDateFilter) {
             const weekType = opts.date!.getWeek() % 2 === 0;
             const dayOfWeek = opts.date!.getDay();
-            return timetable.filter(l => l.timing.weeks?.type === weekType && l.timing.weeks?.dayOfWeek === dayOfWeek);
+            return timetable.filter(l => l.timing.weeks?.isEven === weekType && l.timing.weeks?.dayOfWeek === dayOfWeek);
         } else if (hasDayFilter) return timetable
-            .filter(l => l.timing.weeks?.type === opts.week && l.timing.weeks?.dayOfWeek === opts.day);
+            .filter(l => l.timing.weeks?.isEven === opts.week && l.timing.weeks?.dayOfWeek === opts.day);
 
         return timetable
     }

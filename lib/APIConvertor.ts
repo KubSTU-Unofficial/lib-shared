@@ -223,7 +223,7 @@ export default class APIConvertor {
                         startDate: new Date(elm.graph_aud.datestart), // Потенцивально опасный момент, если elm.graph_aud.datestart не будет задан или будет задан неправильно
                         endDate: new Date(elm.graph_aud.dateend),
 
-                        type: elm.nedtype.nedtype_id == 2,
+                        isEven: elm.nedtype.nedtype_id == 2,
                         dayOfWeek: elm.dayofweek.dayofweek_id,
                     },
                 },

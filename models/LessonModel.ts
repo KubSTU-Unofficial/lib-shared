@@ -18,10 +18,10 @@ export interface ILessonSchema {
         weeks?: {
             from: number;       // С какой недели
             to: number;         // По какую
-            startDate: Date;   // С какой даты
-            endDate: Date;     // По какую
+            startDate: Date;    // С какой даты
+            endDate: Date;      // По какую
 
-            type: boolean;      // Тип недели
+            isEven: boolean;// Тип недели
             dayOfWeek: number;  // День недели
         };
 
@@ -64,7 +64,7 @@ export const lessonSchema = new mongoose.Schema<ILessonSchema, {}, {}, {}, Schem
                 startDate: Date,
                 endDate: Date,
 
-                type: { type: Boolean },
+                isEven: { type: Boolean },
                 dayOfWeek: Number,
             },
 
