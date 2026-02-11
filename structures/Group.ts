@@ -359,7 +359,7 @@ export default abstract class Group {
         return LessonModel.find({
             group: this.name,
             "timing.year": year,
-            "timing.semester": sem,
+            "timing.semester": sem as 1 | 2,
         }).lean().exec();
     }
 

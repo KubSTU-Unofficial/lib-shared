@@ -14,7 +14,12 @@ Date.prototype.getWeek = function () {
 export default async function bootstrap() {
     try {
         mongoose.set('strictQuery', true);
-        await mongoose.connect(process.env.MONGO_URI);
+        await mongoose.connect(process.env.MONGO_URI ?? 'mongodb://localhost:27017/kubstu');
+
+        if (!process.env.KUBSTU_API) {
+            console.error('Отсутствует переменная окружения KUBSTU_API. Выход.')
+            process.exit(0);
+        }
     } catch (error) {
         console.error('Failed to connect to MongoDB:', error);
         process.exit(1);
