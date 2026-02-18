@@ -47,7 +47,7 @@ export default abstract class Group {
         ['20:00', '21:30'],
     ];
 
-    constructor(
+    constructor( // FIXME: 
         public name: string,
         public instId: number,
     ) {
@@ -360,7 +360,7 @@ export default abstract class Group {
             group: this.name,
             "timing.year": year,
             "timing.semester": sem as 1 | 2,
-        }).lean().exec();
+        }, { _id: 0 }).lean().exec();
     }
 
     getTimetableFromCache(ignoreTTL = false) {
