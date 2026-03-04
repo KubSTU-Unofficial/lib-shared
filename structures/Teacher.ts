@@ -20,6 +20,10 @@ export default class BaseTeacher {
 
     constructor(public name: string) { }
 
+    static async getTeachersList() {
+        return LessonModel.distinct("teacherName").lean().exec();
+    }
+
     static async searchTeacher(name: string) {
         let lessons = await LessonModel.find({ teacherName: name }).lean().exec();
 
