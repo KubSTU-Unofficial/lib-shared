@@ -87,7 +87,7 @@ export default class BaseTeacher {
                     "timing.weeks.startDate": { $lte: date },
                     "timing.weeks.endDate": { $gte: date },
                     "timing.weeks.dayOfWeek": date.getDay(),
-                    "timing.weeks.type": date.getWeek() % 2 == 0,
+                    "timing.weeks.isEven": date.getWeek() % 2 == 0,
                 }
             ]
         }).lean().exec();
