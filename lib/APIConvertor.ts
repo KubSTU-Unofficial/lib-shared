@@ -174,7 +174,6 @@ export default class APIConvertor {
         } catch (err) {
             if (n <= 0) {
                 console.log(`[APIConvertor] API DEAD!`);
-
                 console.log(err);
 
                 this.isAPIWorks = false;

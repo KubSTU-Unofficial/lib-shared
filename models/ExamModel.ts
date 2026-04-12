@@ -24,5 +24,6 @@ const schema = new mongoose.Schema<IExam, {}, {}, {}, SchemaDefinitionType<IExam
 );
 
 schema.index({ group: 1 });
+schema.index({ group: 1, semester: 1, year: 1 });
 
 export default mongoose.model('exams', schema);
